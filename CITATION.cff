@@ -1,0 +1,20 @@
+authors:
+- affiliation: Active Inference Institute
+  family-names: Friedman
+  given-names: Daniel Ari
+  orcid: 0000-0001-6232-9096
+cff-version: 1.2.0
+date-released: '2026-10-12'
+keywords:
+- open knowledge network
+- knowledge graphs
+- active inference
+- cognitive science
+- registry publishing
+- reproducible research
+license: MIT
+message: If you use this software, please cite it using the metadata from this file.
+repository-code: https://github.com/docxology/daf-okn
+title: 'DAF-OKN: Open Knowledge Network Pull, Analyze, Visualize, Contribute'
+type: software
+version: 0.2.0

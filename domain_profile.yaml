@@ -1,0 +1,50 @@
+domain: code_research
+display_name: "DAF-OKN: Open Knowledge Network Pull, Analyze, Visualize, Contribute"
+required_packages:
+  - numpy
+  - matplotlib
+  - pytest
+  - networkx
+  - requests
+  - rdflib
+  - pyyaml
+preferred_outputs:
+  - html
+  - json
+validation_gates:
+  - experiment_method_design
+  - artifact_manifest
+  - evidence_grounding
+  - publication_readiness
+figure_types:
+  - registry_catalog
+  - cognitive_network
+  - dashboard
+citation_policy: official_or_scholarly
+source_policy: "Prefer OKN registry documentation (okn.us, registry.okn.us), primary knowledge-graph exports, and scholarly references."
+review_gates:
+  - experiment_method_design
+  - publication_readiness
+artifact_expectations:
+  - output/data/registry_snapshot.yaml
+  - output/data/cognitive_kg.json
+  - output/data/graph_report.json
+  - output/data/manuscript_variables.json
+  - output/figures/registry_catalog.png
+  - output/figures/cognitive_network.png
+  - output/web/dashboard.html
+  - output/manuscript
+benchmark_rubric:
+  name: code-research-readiness
+  dimensions:
+    - name: output_validity
+      weight: 1.0
+    - name: reproducibility_bundle
+      weight: 1.0
+    - name: artifact_manifest
+      weight: 1.0
+    - name: evidence_grounding
+      weight: 2.0
+    - name: publication_readiness
+      weight: 1.0
+llm_prompt_guidance: "Use generated graph artifacts (registry_snapshot.yaml, graph_report.json) and manuscript variables as the evidence source; do not invent numeric results."

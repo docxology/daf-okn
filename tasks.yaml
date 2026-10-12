@@ -1,0 +1,9 @@
+project:
+  name: daf-okn
+  repo: docxology/daf-okn
+tasks:
+  - id: daf-okn-stack-onboarding
+    title: Verify the offline package gate for stack onboarding
+    status: done
+    validationCommand: bash scripts/gate.sh
+    notes: "Offline graph, registry, and script tests pass. Generator smoke tests write into temporary project roots; no live OKN requests or manuscript regeneration are part of this gate."

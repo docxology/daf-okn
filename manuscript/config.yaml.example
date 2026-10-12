@@ -1,0 +1,73 @@
+# daf-okn Configuration (example)
+# Copy this file to config.yaml and edit the values. Keys read by the code:
+#   paper.title, paper.subtitle, paper.version -> CONFIG_TITLE, CONFIG_SUBTITLE, CONFIG_VERSION
+#   authors[0].name                           -> CONFIG_FIRST_AUTHOR
+#   keywords                                  -> CONFIG_KEYWORDS and scripts/08_connector_search.py queries
+# (src/daf_okn/core/manuscript_variables.py, run via
+# scripts/z_generate_manuscript_variables.py). All other keys are descriptive.
+
+paper:
+  title: "Your Title"
+  subtitle: "Optional Subtitle"
+  version: "1.0"
+  date: ""
+
+authors:
+  - name: "Your Name"
+    orcid: "0000-0000-0000-0000"  # https://orcid.org/
+    email: "your.email@university.edu"
+    affiliation: "Your Institution"
+    corresponding: true
+  # Additional authors:
+  # - name: "Co-Author Name"
+  #   orcid: "0000-0000-0000-0000"
+  #   email: "coauthor@university.edu"
+  #   affiliation: "Co-Author Institution"
+  #   corresponding: false
+
+keywords:
+  - "open knowledge network"
+  - "knowledge graphs"
+
+metadata:
+  license: "MIT"
+  language: "en"
+
+# Manuscript variable reference map (documentation only; nothing parses this
+# block). The tokens are produced by generate_variables() in
+# src/daf_okn/core/manuscript_variables.py, run via
+# scripts/z_generate_manuscript_variables.py. Every {{TOKEN}} used in the
+# chapters must be produced by generate_variables(); the regression test
+# tests/core/test_manuscript_variables.py::test_all_manuscript_tokens_are_generated
+# enforces that.
+#
+# Sources:
+#   config      — this file (paper/authors/keywords blocks)
+#   graph_report— output/data/graph_report.json, written by
+#                 daf_okn.analysis.pipeline.run_analysis (analyze stage)
+#   provenance  — computed at generation time (hash, timestamp, versions)
+#
+# In pipeline mode a missing graph_report.json is an error; draft mode
+# (--allow-draft) substitutes explicit "N/A" sentinels instead.
+variables:
+  CONFIG_TITLE: "paper.title"
+  CONFIG_SUBTITLE: "paper.subtitle"
+  CONFIG_VERSION: "paper.version"
+  CONFIG_FIRST_AUTHOR: "authors[0].name"
+  CONFIG_KEYWORDS: "keywords (comma-joined)"
+  GRAPH_NAME: "graph_report.graph_name"
+  NODE_COUNT: "graph_report.metrics.node_count"
+  EDGE_COUNT: "graph_report.metrics.edge_count"
+  DENSITY_PCT: "graph_report.metrics.density × 100"
+  WEAKLY_CONNECTED_COMPONENTS: "graph_report.metrics.weakly_connected_components"
+  STRONGLY_CONNECTED_COMPONENTS: "graph_report.metrics.strongly_connected_components"
+  MEAN_DEGREE: "graph_report.metrics.mean_degree"
+  TRIANGLE_COUNT: "graph_report.metrics.triangles"
+  TOP_NODE_LABEL: "graph_report.metrics.top_central_nodes[0][0]"
+  TOP_NODE_CENTRALITY: "graph_report.metrics.top_central_nodes[0][1]"
+  CONFIG_HASH: "sha256(manuscript/config.yaml), truncated (provenance)"
+  GENERATION_TIMESTAMP: "generation time / SOURCE_DATE_EPOCH (provenance)"
+  PYTHON_VERSION: "runtime (provenance)"
+  PLATFORM: "runtime (provenance)"
+  NETWORKX_VERSION: "runtime (provenance)"
+  MATPLOTLIB_VERSION: "runtime (provenance)"

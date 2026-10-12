@@ -1,0 +1,22 @@
+{
+  "creators": [
+    {
+      "affiliation": "Active Inference Institute",
+      "name": "Friedman, Daniel Ari",
+      "orcid": "0000-0001-6232-9096"
+    }
+  ],
+  "description": "Pull, analyze, visualize, and contribute to the Open Knowledge Network (okn.us); includes exporting the Active Inference Institute 'cognitive' knowledge graph to the OKN registry.",
+  "keywords": [
+    "open knowledge network",
+    "knowledge graphs",
+    "active inference",
+    "cognitive science",
+    "registry publishing",
+    "reproducible research"
+  ],
+  "license": "MIT",
+  "title": "DAF-OKN: Open Knowledge Network Pull, Analyze, Visualize, Contribute",
+  "upload_type": "software",
+  "version": "0.2.0"
+}

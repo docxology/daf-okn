@@ -1,0 +1,90 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "daf-okn"
+version = "0.2.0"
+license = {text = "MIT"}
+description = "Pull, analyze, visualize, and contribute to the Open Knowledge Network (okn.us)"
+readme = "README.md"
+authors = [
+    {name = "Daniel Ari Friedman", email = "daniel@activeinference.institute"}
+]
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.24.0",
+    "matplotlib>=3.7.0",
+    "pillow>=12.3.0",
+    "pyyaml>=6.0",
+    "defusedxml>=0.7.1",
+    "requests>=2.31.0",
+    "networkx>=3.0",
+    "rdflib>=7.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=9.0.3",
+    "pytest-cov>=4.1.0",
+    "pygments>=2.20.0",
+]
+
+[project.scripts]
+daf-okn = "daf_okn.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/docxology/daf-okn"
+Issues = "https://github.com/docxology/daf-okn/issues"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["daf_okn*"]
+
+[tool.pytest.ini_options]
+pythonpath = [".", "src"]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+# `--strict-markers` prevents typos in marker definitions
+addopts = "-v --tb=short --strict-markers"
+markers = [
+    "slow: subprocess and full-pipeline integration checks kept for release profiles",
+]
+filterwarnings = [
+    "error::DeprecationWarning",
+    # rdflib's own N-Quads / TriG / JSON-LD *parsers* still call deprecated rdflib APIs
+    # (Dataset.default_context, ConjunctiveGraph); nothing in this package does.
+    "ignore::DeprecationWarning:rdflib",
+]
+
+[tool.coverage.run]
+# Coverage is measured on the package only, so test code cannot inflate the figure.
+source = ["src"]
+branch = true
+omit = [
+    "tests/*",
+    "*/__init__.py",
+    "*/test_*.py",
+]
+
+[tool.coverage.report]
+fail_under = 90
+show_missing = true
+precision = 2
+exclude_lines = [
+    "pragma: no cover",
+    "if __name__ == .__main__.:",
+    "raise NotImplementedError",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+extend-exclude = [".venv", "output"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["daf_okn"]

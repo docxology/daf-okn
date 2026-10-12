@@ -1,0 +1,69 @@
+# daf-okn Configuration
+# Pull, analyze, visualize, and contribute to the Open Knowledge Network (okn.us).
+# Read by src/daf_okn/core/manuscript_variables.py (via
+# scripts/z_generate_manuscript_variables.py) for the CONFIG_* tokens and the
+# config hash, and by scripts/08_connector_search.py for default search keywords.
+
+paper:
+  title: "DAF-OKN: Open Knowledge Network Pull, Analyze, Visualize, Contribute"
+  subtitle: "Registry pull, graph analysis, visualization, and contribution workflows for okn.us"
+  version: "0.2.0"
+  date: "2026-06-26"
+
+authors:
+  - name: "Daniel Ari Friedman"
+    orcid: "0000-0001-6232-9096"
+    email: "daniel@activeinference.institute"
+    affiliation: "Active Inference Institute"
+    corresponding: true
+
+keywords:
+  - "open knowledge network"
+  - "knowledge graphs"
+  - "active inference"
+  - "cognitive science"
+  - "registry publishing"
+  - "reproducible research"
+
+metadata:
+  license: "MIT"
+  language: "en"
+
+# Manuscript variable reference map (documentation only; nothing parses this
+# block). The tokens are produced by generate_variables() in
+# src/daf_okn/core/manuscript_variables.py, run via
+# scripts/z_generate_manuscript_variables.py. Every {{TOKEN}} used in the
+# chapters must be produced by generate_variables(); the regression test
+# tests/core/test_manuscript_variables.py::test_all_manuscript_tokens_are_generated
+# enforces that.
+#
+# Sources:
+#   config      — this file (paper/authors/keywords blocks)
+#   graph_report— output/data/graph_report.json, written by
+#                 daf_okn.analysis.pipeline.run_analysis (analyze stage)
+#   provenance  — computed at generation time (hash, timestamp, versions)
+#
+# In pipeline mode a missing graph_report.json is an error; draft mode
+# (--allow-draft) substitutes explicit "N/A" sentinels instead.
+variables:
+  CONFIG_TITLE: "paper.title"
+  CONFIG_SUBTITLE: "paper.subtitle"
+  CONFIG_VERSION: "paper.version"
+  CONFIG_FIRST_AUTHOR: "authors[0].name"
+  CONFIG_KEYWORDS: "keywords (comma-joined)"
+  GRAPH_NAME: "graph_report.graph_name"
+  NODE_COUNT: "graph_report.metrics.node_count"
+  EDGE_COUNT: "graph_report.metrics.edge_count"
+  DENSITY_PCT: "graph_report.metrics.density × 100"
+  WEAKLY_CONNECTED_COMPONENTS: "graph_report.metrics.weakly_connected_components"
+  STRONGLY_CONNECTED_COMPONENTS: "graph_report.metrics.strongly_connected_components"
+  MEAN_DEGREE: "graph_report.metrics.mean_degree"
+  TRIANGLE_COUNT: "graph_report.metrics.triangles"
+  TOP_NODE_LABEL: "graph_report.metrics.top_central_nodes[0][0]"
+  TOP_NODE_CENTRALITY: "graph_report.metrics.top_central_nodes[0][1]"
+  CONFIG_HASH: "sha256(manuscript/config.yaml), truncated (provenance)"
+  GENERATION_TIMESTAMP: "generation time / SOURCE_DATE_EPOCH (provenance)"
+  PYTHON_VERSION: "runtime (provenance)"
+  PLATFORM: "runtime (provenance)"
+  NETWORKX_VERSION: "runtime (provenance)"
+  MATPLOTLIB_VERSION: "runtime (provenance)"

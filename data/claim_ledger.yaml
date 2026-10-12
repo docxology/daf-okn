@@ -1,0 +1,21 @@
+# Claim ledger — daf-okn graph-analysis experiment.
+# Result values (node/edge counts, density, connectivity, coverage) are NOT
+# registered here: they flow through {{TOKEN}} variables hydrated from
+# output/data/graph_report.json and output/data/registry_snapshot.yaml by
+# scripts/z_generate_manuscript_variables.py. Only claims sourced from project
+# code, registry documentation, or manuscript captions belong in this file.
+claims:
+  - claim_id: registry-catalog-count
+    kind: number
+    value: 45
+    source: docs/okn/api-notes.md (kgs.yaml graph entries; verified 2026-09-25)
+    source_tier: registry_documentation
+    freshness: active
+    artifact_path: output/data/registry_snapshot.yaml
+  - claim_id: figure-export-dpi
+    kind: number
+    value: 150
+    source: src/daf_okn/figures/network_figure.py plotting defaults (savefig dpi)
+    source_tier: project_source
+    freshness: active
+    artifact_path: output/figures/cognitive_network.png

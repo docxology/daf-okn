@@ -1,0 +1,27 @@
+project: daf-okn
+description: "Pull, analyze, visualize, and contribute to the Open Knowledge Network (okn.us). Graph-analysis experiment: pull the OKN registry catalog (45 graphs), export a knowledge base (cognitive vault case study) to a typed graph, measure structure, visualize, and package a validated registry contribution."
+conditions:
+  - name: cognitive_case_study
+    role: reference
+    description: "Single-graph baseline: export the cognitive vault to a GraphDocument and run the analysis pipeline."
+  - name: registry_catalog_pull
+    role: proposed
+    description: "Pull the full 45-graph OKN registry catalog into output/data/registry_snapshot.yaml."
+  - name: federation_query
+    role: variant
+    description: "Query the unified federation endpoint (named graphs under https://purl.org/okn/frink/kg/{shortname}) across the catalog."
+metrics:
+  primary:
+    name: registry_graph_coverage
+    direction: maximize
+  description: "Fraction of the 45-graph registry catalog pulled/queried/analyzed by the pipeline; measured from output/data/registry_snapshot.yaml (catalog completeness) and output/data/graph_report.json (analyzed-graph metrics)."
+protocol: "Run scripts/00_preflight.py, then scripts/10_research_workflow.py (pull_registry → export_cognitive → analyze_graph → visualize), then scripts/09_provenance_record.py. Identical kgs.yaml snapshot and cognitive repo across all conditions; measure registry coverage from output/data/registry_snapshot.yaml and structural metrics from output/data/graph_report.json."
+expected_figures:
+  - fig:registry_catalog
+  - fig:cognitive_network
+expected_tables:
+  - tbl:graph_metrics
+baselines:
+  - cognitive_case_study
+ablations:
+  - federation_query
