@@ -67,7 +67,9 @@ def test_shipped_files_contain_no_machine_specific_or_third_party_private_detail
     ]
     hits: list[str] = []
     for path in sorted(ROOT.rglob("*")):
-        if not path.is_file() or SKIP_DIRS & set(path.relative_to(ROOT).parts):
+        parts = path.relative_to(ROOT).parts
+        # Virtual environments (including ones set aside as .venv.*) are local, not shipped.
+        if not path.is_file() or SKIP_DIRS & set(parts) or parts[0].startswith(".venv"):
             continue
         if path.name in {"uv.lock", ".coverage"}:
             continue
