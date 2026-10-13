@@ -51,6 +51,10 @@ own vault instead. `python -m daf_okn ...` works the same as `daf-okn ...`.
 
 ## Command line
 
+The cognitive repository owns its graph, licensing, vocabulary and graph-specific
+queries. daf-okn owns capture/replay, registry packaging and upload methods.
+See [canonical RDF and cross-graph workflows](docs/okn/cross-graph.md).
+
 | Command | What it does |
 | --- | --- |
 | `daf-okn pull list [--kgs-path FILE]` | Print the registered graphs (reads `kgs.yaml` from the registry, or a local copy). |
@@ -61,9 +65,9 @@ own vault instead. `python -m daf_okn ...` works the same as `daf-okn ...`.
 | `daf-okn visualize --graph FILE [--figure PNG] [--dashboard HTML] [--metrics JSON] [--layout NAME]` | Render the network figure and the HTML dashboard (`--no-figure` / `--no-dashboard` skip one). |
 | `daf-okn package --graph FILE --out-dir DIR [--fmt nq] [--preset NAME] [--entry-*] [--contact ...]` | Write the contribution package; exits 1 and lists problems if the entry is incomplete. |
 
-Run `daf-okn <command> --help` for every option. Only `pull` touches the network, and
+Run `daf-okn <command> --help` for every option. `pull` and live `join` use the network, and
 `--kgs-path` avoids it for `list` and `snapshot`. `DAF_OKN_COGNITIVE_REPO` is the default for
-`export --repo`.
+`export --repo`. Captured `join --replay` is offline.
 
 The scripts in `scripts/` are thin wrappers over the same code (`scripts/10_research_workflow.py`
 chains pull, export, analyze and visualize for the research manuscript).
@@ -93,7 +97,7 @@ Following RENCI's guidance to reuse existing vocabularies, nodes and edges becom
 | node | `schema:CreativeWork`; also `skos:Concept` (with `skos:prefLabel`, `skos:inScheme`) unless it is an `overview`/`index` page (`schema:CollectionPage`) |
 | title, `description`, `aliases` | `dcterms:title`, `dcterms:description`, `skos:altLabel` |
 | `created`, `updated`, `tags` | `dcterms:created`, `dcterms:modified`, `schema:keywords` |
-| `authors`, `year`, `doi`, `wikidata` | `schema:author`, `schema:datePublished`, `schema:sameAs`, `skos:exactMatch` |
+| `authors`, `year`, `doi`, `wikidata` | `schema:author`, `schema:datePublished`, `schema:sameAs`, `skos:closeMatch` |
 | relation `related` / `relates_to` | `skos:related` |
 | relation `part_of`, `organizes` | `dcterms:isPartOf`, `dcterms:hasPart` |
 | body `[[link]]` (origin `wikilink`) | `dcterms:references` |
@@ -110,9 +114,8 @@ The `cognitive` repository has its own reference exporter,
 [`code/scripts/export_rdf.py`](https://github.com/ActiveInferenceInstitute/cognitive/blob/main/code/scripts/export_rdf.py),
 and documents its vocabulary and registry entry in
 [`docs/okn/`](https://github.com/ActiveInferenceInstitute/cognitive/tree/main/docs/okn). daf-okn
-follows the same shapes and IRI scheme (on the full knowledge base more than 90% of the two
-N-Quads files' lines are identical; the differences are link-resolution details such as links
-into `docs/` and `code/`, per-page `dcterms:source`, and redirect handling). Use the `cognitive` exporter for the
+follows compatible vocabulary and IRI conventions, but link-resolution details such as links
+into `docs/` and `code/`, per-page `dcterms:source`, and redirect handling differ. Use the `cognitive` exporter for the
 canonical `cognitive-kb` submission; use daf-okn for the generic vault-to-graph path, analysis,
 visualization and packaging of other graphs. For a `cognitive` checkout, `daf-okn package
 --preset cognitive-kb` fills in that graph's registry entry:

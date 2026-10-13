@@ -134,7 +134,8 @@ def test_node_fields_map_to_dcterms_skos_and_schema() -> None:
     assert (fe, SCHEMA.author, Literal("A. Author")) in graph
     assert (fe, SCHEMA.datePublished, Literal("2022", datatype=XSD.gYear)) in graph
     assert (fe, SCHEMA.sameAs, URIRef("https://doi.org/10.1000/xyz%201")) in graph
-    assert (fe, SKOS.exactMatch, URIRef("http://www.wikidata.org/entity/Q42")) in graph
+    assert (fe, SKOS.closeMatch, URIRef("http://www.wikidata.org/entity/Q42")) in graph
+    assert not list(graph.triples((fe, SKOS.exactMatch, None)))
 
 
 def test_unmapped_attributes_live_under_vocab() -> None:
@@ -159,7 +160,7 @@ def test_invalid_wikidata_id_falls_back_to_vocab() -> None:
         nodes=[NodeRecord(id="p", title="P", attributes={"wikidata": "not-a-qid"})],
     )
     graph = build_rdf_graph(doc, namespace_base=BASE)
-    assert not list(graph.triples((None, SKOS.exactMatch, None)))
+    assert not list(graph.triples((None, SKOS.closeMatch, None)))
     assert (_page("p"), URIRef(BASE + "vocab/wikidata"), Literal("not-a-qid")) in graph
 
 

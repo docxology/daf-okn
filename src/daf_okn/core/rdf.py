@@ -12,7 +12,7 @@ produces the same shapes as the reference exporter in the Active Inference Insti
   ``skos:prefLabel``;
 * node fields map to ``dcterms:title``, ``dcterms:description``, ``skos:altLabel``,
   ``dcterms:created``, ``dcterms:modified``, ``schema:keywords``, ``schema:author``,
-  ``schema:datePublished``, ``schema:sameAs`` (DOI) and ``skos:exactMatch`` (Wikidata);
+  ``schema:datePublished``, ``schema:sameAs`` (DOI) and ``skos:closeMatch`` (Wikidata);
 * edge relations map to ``skos:related``, ``dcterms:isPartOf``, ``dcterms:hasPart``,
   ``dcterms:references`` (body wiki links) and ``dcterms:isReplacedBy`` (redirects);
   any other relation name becomes a term under ``<base>relation/`` that is declared an
@@ -261,7 +261,7 @@ def _describe_node(
     qid = _text(attributes.get("wikidata", ""))
     wikidata_ok = bool(_WIKIDATA_ID.fullmatch(qid))
     if wikidata_ok:
-        graph.add((subject, SKOS.exactMatch, URIRef("http://www.wikidata.org/entity/" + qid)))
+        graph.add((subject, SKOS.closeMatch, URIRef("http://www.wikidata.org/entity/" + qid)))
 
     for key in sorted(attributes):
         if key in _MAPPED_ATTRIBUTES and not (key == "wikidata" and qid and not wikidata_ok):
