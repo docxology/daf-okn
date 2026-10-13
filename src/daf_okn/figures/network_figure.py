@@ -125,7 +125,6 @@ def _draw_network(
         graph,
         positions,
         ax=ax,
-        arrows=graph.is_directed(),
         arrowsize=10,
         edge_color=_EDGE_COLOR,
         alpha=0.6,

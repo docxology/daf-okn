@@ -3,7 +3,7 @@
 Commands (each is a thin wrapper over the library):
 
 * ``pull``      -- list / snapshot the OKN registry, or run a SPARQL query
-                   (:mod:`daf_okn.core.registry`; the only commands that use the network,
+                   (:mod:`daf_okn.core.registry`; these commands use the network,
                    and ``--kgs-path`` reads a local ``kgs.yaml`` instead).
 * ``export``    -- turn an Obsidian-style markdown vault (e.g. the Active Inference
                    Institute ``cognitive`` knowledge base) into a graph JSON document
@@ -23,6 +23,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import subprocess
 import sys
 from collections.abc import Sequence
 from pathlib import Path
@@ -31,12 +32,30 @@ from typing import Any
 import yaml
 
 from . import __version__
+from .analysis import cross_graph
+from .core import rdf_submission
 from .core.contribute import add_package_arguments, run_package
 from .core.registry import OKNRegistry, RegistryError
 
 __all__ = ["build_parser", "main"]
 
 COGNITIVE_REPO_ENV = "DAF_OKN_COGNITIVE_REPO"
+
+
+def _cmd_join(args: argparse.Namespace) -> int:
+    cross_graph.run(
+        cross_graph.JoinOptions(args.source, args.query, args.output, args.endpoint, args.replay)
+    )
+    return 0
+
+
+def _cmd_bundle_rdf(args: argparse.Namespace) -> int:
+    if args.check:
+        errors = rdf_submission.verify(args.output)
+        print(json.dumps({"bundle_verified": not errors, "errors": errors}, indent=2))
+        return 1 if errors else 0
+    rdf_submission.prepare(args.root.resolve(), args.output.resolve())
+    return 0
 
 
 # ----------------------------------------------------------------------------- pull
@@ -267,6 +286,18 @@ def build_parser() -> argparse.ArgumentParser:
     )
     add_package_arguments(package)
     package.set_defaults(func=run_package)
+    join = commands.add_parser("join", help="capture or replay a cross-graph RDF join")
+    join.add_argument("--source", required=True, type=Path)
+    join.add_argument("--query", required=True, type=Path)
+    join.add_argument("--output", required=True, type=Path)
+    join.add_argument("--endpoint", default=cross_graph.ENDPOINT)
+    join.add_argument("--replay", type=Path, help="captured response directory")
+    join.set_defaults(func=_cmd_join)
+    bundle = commands.add_parser("bundle-rdf", help="verify and package canonical cognitive RDF")
+    bundle.add_argument("--root", default=Path("."), type=Path)
+    bundle.add_argument("--output", required=True, type=Path)
+    bundle.add_argument("--check", action="store_true")
+    bundle.set_defaults(func=_cmd_bundle_rdf)
     return parser
 
 
@@ -278,7 +309,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     except RegistryError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
-    except (OSError, ValueError, KeyError, json.JSONDecodeError) as exc:
+    except (
+        OSError,
+        ValueError,
+        KeyError,
+        TypeError,
+        json.JSONDecodeError,
+        subprocess.CalledProcessError,
+    ) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
 

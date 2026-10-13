@@ -70,7 +70,7 @@ PRESET_ENTRIES: dict[str, dict[str, Any]] = {
         ),
         "homepage": "https://github.com/ActiveInferenceInstitute/cognitive",
         "source": "https://github.com/ActiveInferenceInstitute/cognitive",
-        "license": "https://creativecommons.org/licenses/by-nc-sa/4.0/",
+        "license": "https://creativecommons.org/licenses/by/4.0/",
         "language": "en",
         "contacts": [
             {

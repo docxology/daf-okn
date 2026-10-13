@@ -35,7 +35,7 @@ def degree_sequence(graph: nx.Graph | nx.DiGraph) -> list[int]:
 
 def in_out_degrees(graph: nx.Graph | nx.DiGraph) -> dict[str, tuple[int, int]]:
     """Return ``{node: (in_degree, out_degree)}`` for a directed projection."""
-    if not graph.is_directed():
+    if not isinstance(graph, nx.DiGraph):
         raise TypeError("in_out_degrees requires a directed graph; use to_networkx(directed=True)")
     return {node: (graph.in_degree(node), graph.out_degree(node)) for node in graph.nodes}
 
@@ -64,7 +64,7 @@ def edge_centrality_scores(
 def component_counts(graph: nx.Graph | nx.DiGraph) -> dict[str, int]:
     """Return weakly (and, for directed graphs, strongly) connected component counts."""
     counts: dict[str, int] = {}
-    if graph.is_directed():
+    if isinstance(graph, nx.DiGraph):
         counts["weakly"] = nx.number_weakly_connected_components(graph)
         counts["strongly"] = nx.number_strongly_connected_components(graph)
     else:
@@ -74,8 +74,11 @@ def component_counts(graph: nx.Graph | nx.DiGraph) -> dict[str, int]:
 
 def triangle_count(graph: nx.Graph | nx.DiGraph) -> int:
     """Count triangles in the undirected simple projection of ``graph``."""
-    undirected = nx.Graph(graph)
-    return sum(nx.triangles(undirected).values()) // 3
+    undirected: nx.Graph = nx.Graph(graph)
+    counts = nx.triangles(undirected)
+    if not isinstance(counts, dict):
+        raise TypeError("triangle counts must be a node mapping")
+    return sum(counts.values()) // 3
 
 
 def _top_central_nodes(scores: dict[str, float], top_k: int) -> list[tuple[str, float]]:

@@ -38,6 +38,12 @@ flowchart TB
 
 ## Artifact Map
 
+`daf-okn join` writes a fresh capture directory with raw queries, SPARQL responses,
+hash manifest and linked join results. `--replay` verifies and reuses those inputs
+offline. `daf-okn bundle-rdf` writes canonical RDF, graph documentation, registry
+files and `bundle.json`; `--check` validates the actual directory. Use a fresh
+output directory for each capture or bundle, preserving failures and earlier evidence.
+
 | Artifact | Producer | Consumer |
 |---|---|---|
 | `output/data/registry_snapshot.yaml` | `scripts/pull_registry.py` / `10_research_workflow.py` stage 1 | coverage measurement, downstream stages |

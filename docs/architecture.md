@@ -1,5 +1,11 @@
 # Architecture: The Thin Orchestrator Flow
 
+Canonical RDF capture/replay lives in `src/daf_okn/analysis/cross_graph.py`;
+byte-preserving submission packaging and verification live in
+`src/daf_okn/core/rdf_submission.py`. Their command parsing is in
+`src/daf_okn/cli.py` (`join`, `bundle-rdf`). These methods consume cognitive's
+canonical artifacts rather than importing its exporter or duplicating its graph.
+
 The `daf_okn` project is designed around a strict separation of concerns across three layers. Understanding this architecture before modifying any file prevents the most common errors: project logic appearing in scripts, reusable graph behavior remaining trapped in CLI files, and mocks appearing in tests.
 
 ## Layer Reference

@@ -26,7 +26,7 @@ import json
 from collections.abc import Iterable
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal, overload
 
 import networkx as nx
 
@@ -99,6 +99,15 @@ class GraphDocument:
     # ------------------------------------------------------------------
     # Conversions
     # ------------------------------------------------------------------
+
+    @overload
+    def to_networkx(self, directed: Literal[True] = True) -> nx.DiGraph: ...
+
+    @overload
+    def to_networkx(self, directed: Literal[False]) -> nx.Graph: ...
+
+    @overload
+    def to_networkx(self, directed: bool) -> nx.DiGraph | nx.Graph: ...
 
     def to_networkx(self, directed: bool = True) -> nx.DiGraph | nx.Graph:
         """Project the document onto a networkx graph.
