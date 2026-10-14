@@ -1,5 +1,9 @@
 # Architecture: The Thin Orchestrator Flow
 
+The offline development profile is the declared `dev` extra. The `build`
+dependency group locks the declared setuptools backend for wheel builds with
+`uv build --wheel --no-build-isolation`.
+
 Canonical RDF capture/replay lives in `src/daf_okn/analysis/cross_graph.py`;
 byte-preserving submission packaging and verification live in
 `src/daf_okn/core/rdf_submission.py`. Their command parsing is in
@@ -26,6 +30,18 @@ tests/   ──→ scripts/        (CLI smoke tests)
 ```
 
 No arrows go upward. Core project logic stays independent; `analysis/`, `figures/`, and `dashboard/` are the importable implementation behind the thin script wrappers.
+
+Contribution packaging applies `GraphDocument.validate()` before reporting its
+verdict, so dangling endpoints, duplicate or empty node IDs, and self-loops
+cannot produce a successful `daf-okn package` exit. Diagnostic draft artifacts
+remain available for structurally invalid graphs. Invalid shortnames and
+resolved graph/registry/checklist destinations outside the requested output
+directory prevent all package writes, including when an existing destination
+symlink points outside that directory. Graph, registry entry and checklist
+must refer to distinct physical files; symlink and hardlink collisions refuse
+all writes. Both the direct validator and CLI have
+real-file passing and failing controls under `tests/core/test_contribute.py`
+and `tests/cli/test_cli.py`.
 
 ```mermaid
 graph TD

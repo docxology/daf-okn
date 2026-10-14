@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import importlib
+import os
 import sys
 from pathlib import Path
 
@@ -46,6 +47,103 @@ ENTRY_FIELDS = [
     "contacts",
 ]
 CONTACT = {"email": "maintainer@example.org", "github": "maintainer", "label": "Maintainer"}
+
+
+@pytest.mark.parametrize("shortname", ["../escaped", "bad/name"])
+def test_unsafe_shortname_is_rejected_before_any_write(tmp_path: Path, shortname: str) -> None:
+    doc = _sample_doc()
+    doc.metadata["entry"]["shortname"] = shortname
+    out_dir = tmp_path / "package"
+    sentinel = tmp_path / "escaped.nq"
+    sentinel.write_text("preserve", encoding="utf-8")
+
+    problems = validate_package(doc, out_dir)
+
+    assert any("shortname" in problem for problem in problems)
+    assert sentinel.read_text(encoding="utf-8") == "preserve"
+    assert not out_dir.exists()
+
+
+def test_absolute_shortname_is_rejected_before_any_write(tmp_path: Path) -> None:
+    doc = _sample_doc()
+    doc.metadata["entry"]["shortname"] = str(tmp_path / "absolute")
+
+    problems = validate_package(doc, tmp_path / "package")
+
+    assert any("shortname" in problem for problem in problems)
+    assert not (tmp_path / "absolute.nq").exists()
+
+
+@pytest.mark.parametrize("destination", ["graph", "registry", "checklist"])
+def test_package_rejects_destination_symlink_escape(tmp_path: Path, destination: str) -> None:
+    out_dir = tmp_path / "package"
+    out_dir.mkdir()
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    targets = {
+        "graph": out_dir / "demo-graph.nq",
+        "registry": out_dir / "registry",
+        "checklist": out_dir / "checklist.md",
+    }
+    targets[destination].symlink_to(
+        outside / "sentinel" if destination != "registry" else outside,
+        target_is_directory=destination == "registry",
+    )
+
+    problems = validate_package(_sample_doc(), out_dir)
+
+    assert any("escapes output directory" in problem for problem in problems)
+    assert list(outside.iterdir()) == []
+
+
+def test_package_allows_destination_symlink_within_output_directory(tmp_path: Path) -> None:
+    out_dir = tmp_path / "package"
+    out_dir.mkdir()
+    registry = out_dir / "internal-registry"
+    registry.mkdir()
+    (out_dir / "registry").symlink_to(registry, target_is_directory=True)
+
+    problems = validate_package(_sample_doc(), out_dir)
+
+    assert problems == []
+    assert (registry / registry_entry_path("demo-graph")).is_file()
+
+
+@pytest.mark.parametrize("kind", ["symlink", "hardlink"])
+def test_package_rejects_aliased_output_files_before_writing(tmp_path: Path, kind: str) -> None:
+    out_dir = tmp_path / "package"
+    out_dir.mkdir()
+    graph = out_dir / "demo-graph.nq"
+    graph.write_text("preserve graph", encoding="utf-8")
+    checklist = out_dir / "checklist.md"
+    if kind == "symlink":
+        checklist.symlink_to(graph.name)
+    else:
+        os.link(graph, checklist)
+
+    problems = validate_package(_sample_doc(), out_dir)
+
+    assert any("alias" in problem for problem in problems)
+    assert graph.read_text(encoding="utf-8") == "preserve graph"
+    assert checklist.read_text(encoding="utf-8") == "preserve graph"
+    assert not (out_dir / "registry").exists()
+
+
+@pytest.mark.parametrize("defect", ["dangling", "duplicate", "empty", "self-loop"])
+def test_package_reports_structural_invariants(tmp_path: Path, defect: str) -> None:
+    doc = _sample_doc()
+    changes = {
+        "dangling": lambda: doc.edges.append(EdgeRecord("area/one", "missing")),
+        "duplicate": lambda: doc.nodes.append(NodeRecord("area/one", "Duplicate")),
+        "empty": lambda: doc.nodes.append(NodeRecord("", "Empty")),
+        "self-loop": lambda: doc.edges.append(EdgeRecord("area/one", "area/one")),
+    }
+    changes[defect]()
+    expected = doc.validate()
+
+    problems = validate_package(doc, tmp_path / "package")
+
+    assert expected and set(expected) <= set(problems)
 
 
 def _frontmatter(text: str) -> dict[str, object]:

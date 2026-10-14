@@ -2,6 +2,9 @@
 requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
+[dependency-groups]
+build = ["setuptools>=61.0"]
+
 [project]
 name = "daf-okn"
 version = "0.2.0"

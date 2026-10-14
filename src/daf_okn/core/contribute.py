@@ -285,37 +285,18 @@ def validate_package(doc: GraphDocument, out_dir: Path) -> list[str]:
 
     Entry inputs come from ``doc.metadata["entry"]`` (``shortname``, ``title``,
     ``description``, ``homepage``, ``funding``, ``license``, ``source``, ``language``,
-    ``body``, ``contacts``). Problems are reported rather than raised; files are written
-    regardless.
+    ``body``, ``contacts``). Structural problems are included in the returned
+    diagnostics. Invalid shortnames or destinations outside ``out_dir`` prevent
+    all writes; other diagnostics retain the inspectable draft package.
     """
 
-    out_dir.mkdir(parents=True, exist_ok=True)
-    problems: list[str] = []
+    problems = doc.validate()
 
     entry = _entry_from_metadata(doc)
     graph_name = doc.name or "graph"
     if not doc.name:
         problems.append("graph name is empty")
     problems.extend(_collect_iri_issues(doc))
-
-    shortname = str(entry.get("shortname") or shortname_slug(graph_name))
-    if not _SHORTNAME.fullmatch(shortname):
-        problems.append(f"shortname must be lowercase letters, digits and hyphens: {shortname!r}")
-    namespace_base = str(entry.get("namespace_base") or default_namespace_base(shortname))
-
-    fmt = doc.metadata.get("fmt", "nq") if isinstance(doc.metadata, dict) else "nq"
-    if fmt not in SUPPORTED_FORMATS:
-        problems.append(f"unsupported fmt: {fmt!r}")
-        fmt = "nq"
-
-    graph_to_rdf(
-        doc,
-        out_dir / f"{shortname}.{fmt}",
-        fmt=fmt,
-        namespace_base=namespace_base,
-        named_graph=bool(doc.name),
-        entry=entry,
-    )
 
     title = str(entry.get("title") or doc.name or graph_name)
     description = str(entry.get("description") or "")
@@ -331,6 +312,57 @@ def validate_package(doc: GraphDocument, out_dir: Path) -> list[str]:
     if not description:
         problems.append("missing description in entry inputs")
 
+    shortname = str(entry.get("shortname") or shortname_slug(graph_name))
+    if not _SHORTNAME.fullmatch(shortname):
+        problems.append(f"shortname must be lowercase letters, digits and hyphens: {shortname!r}")
+        return problems
+    namespace_base = str(entry.get("namespace_base") or default_namespace_base(shortname))
+
+    fmt = doc.metadata.get("fmt", "nq") if isinstance(doc.metadata, dict) else "nq"
+    if fmt not in SUPPORTED_FORMATS:
+        problems.append(f"unsupported fmt: {fmt!r}")
+        fmt = "nq"
+
+    graph_file = out_dir / f"{shortname}.{fmt}"
+    entry_file = out_dir / "registry" / registry_entry_path(shortname)
+    checklist_file = out_dir / "checklist.md"
+    resolved_root = out_dir.resolve()
+    escaped = [
+        destination
+        for destination in (graph_file, entry_file, checklist_file)
+        if not destination.resolve().is_relative_to(resolved_root)
+    ]
+    if escaped:
+        problems.extend(f"package destination escapes output directory: {path}" for path in escaped)
+        return problems
+
+    destinations = (graph_file, entry_file, checklist_file)
+    for index, destination in enumerate(destinations):
+        for previous in destinations[:index]:
+            try:
+                alias = destination.resolve() == previous.resolve() or (
+                    destination.exists() and previous.exists() and destination.samefile(previous)
+                )
+            except OSError as exc:
+                problems.append(f"cannot verify package destination {destination}: {exc}")
+                return problems
+            if alias:
+                problems.append(
+                    f"package destinations alias the same file: {previous} and {destination}"
+                )
+                return problems
+
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    graph_to_rdf(
+        doc,
+        graph_file,
+        fmt=fmt,
+        namespace_base=namespace_base,
+        named_graph=bool(doc.name),
+        entry=entry,
+    )
+
     registry_markdown = registry_entry(
         shortname=shortname,
         title=title,
@@ -340,11 +372,10 @@ def validate_package(doc: GraphDocument, out_dir: Path) -> list[str]:
         funding=str(entry["funding"]) if entry.get("funding") else None,
         body=str(entry.get("body") or _default_body(entry, namespace_base)),
     )
-    entry_file = out_dir / "registry" / registry_entry_path(shortname)
     entry_file.parent.mkdir(parents=True, exist_ok=True)
     entry_file.write_text(registry_markdown, encoding="utf-8")
 
-    (out_dir / "checklist.md").write_text(
+    checklist_file.write_text(
         "\n".join(f"- {item}" for item in contribution_checklist()) + "\n",
         encoding="utf-8",
     )

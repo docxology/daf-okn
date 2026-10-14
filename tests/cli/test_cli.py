@@ -367,3 +367,71 @@ def test_package_invalid_contact_json_is_a_reported_error(tmp_path: Path, capsys
     )
     assert code == 1
     assert "error:" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("defect", ["dangling", "unsafe-shortname"])
+def test_package_cli_rejects_invalid_contribution(tmp_path: Path, defect: str) -> None:
+    doc = GraphDocument.load_json(_graph_file(tmp_path))
+    if defect == "dangling":
+        doc.edges.append(EdgeRecord("area/a", "missing"))
+    graph = doc.save_json(tmp_path / "invalid.json")
+    out_dir = tmp_path / "package"
+    shortname = "../escaped" if defect == "unsafe-shortname" else "mini-kg"
+    args = [
+        "package",
+        "--graph",
+        str(graph),
+        "--out-dir",
+        str(out_dir),
+        "--entry-shortname",
+        shortname,
+        "--entry-description",
+        "Fixture",
+        "--entry-homepage",
+        "https://example.org",
+        "--contact",
+        "email=me@example.org",
+    ]
+
+    result = subprocess.run(
+        [sys.executable, "-m", "daf_okn", *args],
+        cwd=PROJECT_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert not (tmp_path / "escaped.nq").exists()
+
+
+def test_package_cli_rejects_aliased_output_before_writing(tmp_path: Path, capsys) -> None:
+    out_dir = tmp_path / "package"
+    out_dir.mkdir()
+    graph_output = out_dir / "mini-kg.nq"
+    graph_output.write_text("preserve", encoding="utf-8")
+    (out_dir / "checklist.md").symlink_to(graph_output.name)
+
+    code = main(
+        [
+            "package",
+            "--graph",
+            str(_graph_file(tmp_path)),
+            "--out-dir",
+            str(out_dir),
+            "--entry-shortname",
+            "mini-kg",
+            "--entry-description",
+            "Fixture",
+            "--entry-homepage",
+            "https://example.org",
+            "--contact",
+            "email=me@example.org",
+        ]
+    )
+
+    assert code == 1
+    assert "alias" in capsys.readouterr().out
+    assert graph_output.read_text(encoding="utf-8") == "preserve"
+    assert not (out_dir / "registry").exists()
