@@ -110,6 +110,30 @@ def test_network_failure_retains_receipt_and_returns_failure(tmp_path, path):
     assert list(out.glob("*.json"))
 
 
+def test_exact_keys_work_and_other_external_terms_are_not_requested(tmp_path):
+    source = local_export(tmp_path)
+    dataset = Dataset().parse(source, format="nquads")
+    graph = dataset.graph(URIRef(join.GRAPH))
+    graph.remove((None, URIRef(join.PREFIXES["skos"] + "closeMatch"), None))
+    graph.add((URIRef(PAGE), URIRef(join.EXACT), URIRef(WD)))
+    graph.add((URIRef(PAGE), URIRef(join.EXACT), URIRef(TERM)))
+    graph.add(
+        (
+            URIRef(PAGE),
+            URIRef("http://www.w3.org/2000/01/rdf-schema#seeAlso"),
+            URIRef("http://www.wikidata.org/entity/Q1"),
+        )
+    )
+    dataset.serialize(source, format="nquads")
+    out = tmp_path / "capture"
+    with endpoint_server() as endpoint:
+        assert run_cli(arguments(source, out) + ["--endpoint", endpoint]) == 0
+    manifest = json.loads((out / "manifest.json").read_text())
+    assert manifest["requested_wikidata_keys"] == 1
+    requested = (out / "identifier-mappings-0000.rq").read_text()
+    assert WD in requested and TERM not in requested
+
+
 def test_reusing_capture_directory_does_not_overwrite_evidence(tmp_path):
     source = local_export(tmp_path)
     out = tmp_path / "capture"

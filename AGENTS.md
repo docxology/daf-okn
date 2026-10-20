@@ -199,7 +199,7 @@ flowchart TB
 uv run pytest tests/ --cov=src --cov-fail-under=90
 
 # Type hint verification (same project source surface used by CI)
-uv run mypy src
+uv run mypy -p daf_okn
 
 # Documentation completeness check
 find . -name "*.py" -exec grep -L '"""' {} \;

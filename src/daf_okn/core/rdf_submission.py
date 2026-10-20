@@ -9,8 +9,10 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
-from rdflib import Dataset, Graph, URIRef
-from rdflib.namespace import DCTERMS
+from rdflib import Dataset, Graph, Literal, URIRef
+from rdflib.namespace import DCTERMS, RDF, SKOS, XSD
+
+from .alignment import RELATIONS, reviewed_mappings
 
 
 @dataclass(frozen=True, slots=True)
@@ -46,6 +48,7 @@ def prepare(root: Path, output: Path) -> None:
         "docs/okn/submission_criteria.md",
         "docs/okn/interoperability.md",
         "docs/okn/landing_zone.md",
+        "docs/okn/alignment-review.md",
     ):
         shutil.copyfile(root / name, output / Path(name).name)
     entry = (root / "docs/okn/registry_entry.md").read_text(encoding="utf-8")
@@ -62,7 +65,17 @@ def prepare(root: Path, output: Path) -> None:
     for name, summary, tags in (
         (
             "concept_mappings.rq",
-            "Cognitive concept pages and their candidate Wikidata mappings",
+            "Cognitive concepts and their source-reviewed external mappings",
+            ["cognitive-kb"],
+        ),
+        (
+            "mapping_evidence.rq",
+            "Sources, rationales and dates for reviewed cognitive correspondences",
+            ["cognitive-kb"],
+        ),
+        (
+            "keyword_concepts.rq",
+            "Concept identifiers used as cognitive page keywords",
             ["cognitive-kb"],
         ),
         (
@@ -128,15 +141,74 @@ def validate_export(directory: Path, root: Path | None = None) -> list[str]:
         URIRef("https://creativecommons.org/licenses/by/4.0/"),
         URIRef("https://creativecommons.org/publicdomain/zero/1.0/"),
     }
-    for subject in (URIRef(manifest["graph"] + "/dataset"), URIRef(manifest["graph"] + "/scheme")):
-        licenses = set(graph.objects(subject, DCTERMS.license))
+    for licensed_resource in (
+        URIRef(manifest["graph"] + "/dataset"),
+        URIRef(manifest["graph"] + "/scheme"),
+    ):
+        licenses = set(graph.objects(licensed_resource, DCTERMS.license))
         if len(licenses) != 1 or not licenses <= allowed:
-            errors.append(f"incompatible or missing license: {subject}")
+            errors.append(f"incompatible or missing license: {licensed_resource}")
     if URIRef(manifest["license"]) not in allowed:
         errors.append("incompatible manifest license")
     for page_subject, license_iri in graph.subject_objects(DCTERMS.license):
         if license_iri not in allowed:
             errors.append(f"incompatible page license: {page_subject}")
+    schema_keywords = URIRef("https://schema.org/keywords")
+    for subject, keyword in graph.subject_objects(schema_keywords):
+        if not isinstance(keyword, URIRef):
+            errors.append(f"keyword must be a concept IRI: {subject}")
+        elif (
+            str(keyword).startswith(manifest["graph"] + "/keyword/")
+            and (keyword, RDF.type, SKOS.Concept) not in graph
+        ):
+            errors.append(f"local keyword lacks concept declaration: {keyword}")
+    for relation in RELATIONS:
+        predicate = URIRef(str(SKOS) + relation)
+        for subject, target in graph.subject_objects(predicate):
+            if not isinstance(target, URIRef) or (subject, RDF.type, SKOS.Concept) not in graph:
+                errors.append(f"mapping endpoints must be concepts and IRIs: {subject}")
+            evidenced = False
+            for statement in graph.subjects(RDF.subject, subject):
+                if (
+                    (statement, RDF.type, RDF.Statement) not in graph
+                    or (statement, RDF.predicate, predicate) not in graph
+                    or (statement, RDF.object, target) not in graph
+                ):
+                    continue
+                sources = list(graph.objects(statement, DCTERMS.source))
+                rationales = list(graph.objects(statement, DCTERMS.description))
+                dates = list(graph.objects(statement, DCTERMS.date))
+                if len(sources) != 1 or len(rationales) != 1 or len(dates) != 1:
+                    continue
+                if (
+                    not isinstance(sources[0], URIRef)
+                    or not isinstance(rationales[0], Literal)
+                    or not isinstance(dates[0], Literal)
+                    or dates[0].datatype != XSD.date
+                ):
+                    continue
+                try:
+                    reviewed_mappings(
+                        [
+                            dict(
+                                target=str(target),
+                                relation=relation,
+                                evidence=str(sources[0]),
+                                rationale=str(rationales[0]),
+                                reviewed_on=str(dates[0]),
+                            )
+                        ]
+                    )
+                except ValueError:
+                    continue
+                evidenced = True
+            if not evidenced:
+                errors.append(
+                    f"mapping lacks complete review evidence: {subject} {predicate} {target}"
+                )
+    for name in ("cited_by", "cites"):
+        if any(graph.triples((None, URIRef(manifest["graph"] + "/relation/" + name), None))):
+            errors.append(f"use BIBO rather than custom citation predicate: {name}")
     return errors
 
 

@@ -12,9 +12,11 @@ produces the same shapes as the reference exporter in the Active Inference Insti
   ``skos:prefLabel``;
 * node fields map to ``dcterms:title``, ``dcterms:description``, ``skos:altLabel``,
   ``dcterms:created``, ``dcterms:modified``, ``schema:keywords``, ``schema:author``,
-  ``schema:datePublished``, ``schema:sameAs`` (DOI) and ``skos:closeMatch`` (Wikidata);
+  ``schema:datePublished``, ``schema:sameAs`` (DOI) and ``rdfs:seeAlso`` (unreviewed Wikidata);
+  keywords are concept IRIs and explicit reviewed mappings carry RDF statement evidence;
 * edge relations map to ``skos:related``, ``dcterms:isPartOf``, ``dcterms:hasPart``,
-  ``dcterms:references`` (body wiki links) and ``dcterms:isReplacedBy`` (redirects);
+  ``dcterms:references`` (body wiki links), BIBO citation predicates and
+  ``dcterms:isReplacedBy`` (redirects);
   any other relation name becomes a term under ``<base>relation/`` that is declared an
   ``rdfs:subPropertyOf skos:semanticRelation`` with an ``rdfs:label``;
 * all other node attributes stay available as ``<base>vocab/<key>`` properties;
@@ -28,6 +30,7 @@ timestamps are emitted, and the dataset's ``dcterms:modified`` is the latest nod
 
 from __future__ import annotations
 
+import hashlib
 import re
 from collections.abc import Iterable
 from datetime import date, datetime
@@ -38,6 +41,7 @@ from urllib.parse import quote
 from rdflib import BNode, Graph, Literal, Namespace, URIRef
 from rdflib.namespace import DCAT, DCTERMS, PROV, RDF, RDFS, SKOS, VOID, XSD
 
+from .alignment import reviewed_mappings
 from .graph import EdgeRecord, GraphDocument, NodeRecord
 
 __all__ = [
@@ -56,6 +60,11 @@ KG_BASE = "https://purl.org/okn/frink/kg/"
 TOOL_URL = "https://github.com/docxology/daf-okn"
 
 SCHEMA = Namespace("https://schema.org/")
+BIBO = Namespace("http://purl.org/ontology/bibo/")
+KEYWORD_TERMS = {
+    "model_fitting": "http://purl.obolibrary.org/obo/STATO_0000218",
+    "computational_modeling": "http://purl.obolibrary.org/obo/NCIT_C16461",
+}
 
 SUPPORTED_FORMATS = {
     "nt": "nt",
@@ -73,6 +82,8 @@ _PREFIXES = {
     "prov": PROV,
     "dcat": DCAT,
     "void": VOID,
+    "bibo": BIBO,
+    "sio": Namespace("http://semanticscience.org/resource/"),
 }
 
 # Relation names a standard vocabulary already covers (same table as the reference
@@ -87,6 +98,8 @@ _STANDARD_RELATIONS: dict[str, URIRef] = {
     "has_parent": DCTERMS.isPartOf,
     "organizes": DCTERMS.hasPart,
     "redirects_to": DCTERMS.isReplacedBy,
+    "cites": BIBO.cites,
+    "cited_by": BIBO.citedBy,
 }
 
 # Node attributes that have a standard-vocabulary home; everything else goes to vocab/.
@@ -102,6 +115,9 @@ _MAPPED_ATTRIBUTES = frozenset(
         "year",
         "doi",
         "wikidata",
+        "external_mappings",
+        "definition",
+        "scope_note",
     }
 )
 _NAVIGATION_TYPES = frozenset({"overview", "index"})
@@ -233,6 +249,9 @@ def _describe_node(
     description = _text(attributes.get("description", ""))
     if description:
         graph.add((subject, DCTERMS.description, _lit(description, language)))
+    for key, predicate in (("definition", SKOS.definition), ("scope_note", SKOS.scopeNote)):
+        if attributes.get(key):
+            graph.add((subject, predicate, _lit(_text(attributes[key]), language)))
     for alias in _scalars(attributes.get("aliases")):
         if _text(alias):
             graph.add((subject, SKOS.altLabel, _lit(_text(alias), language)))
@@ -244,7 +263,17 @@ def _describe_node(
         modified.append(_text(updated))
     for tag in _scalars(attributes.get("tags")):
         if _text(tag):
-            graph.add((subject, SCHEMA.keywords, Literal(_text(tag))))
+            label = _text(tag)
+            if label in KEYWORD_TERMS:
+                graph.add((subject, SCHEMA.keywords, URIRef(KEYWORD_TERMS[label])))
+                continue
+            keyword = URIRef(base + "keyword/" + quote(label, safe="-._~"))
+            graph.add((subject, SCHEMA.keywords, keyword))
+            graph.add((keyword, RDF.type, SKOS.Concept))
+            graph.add((keyword, RDF.type, SCHEMA.DefinedTerm))
+            graph.add((keyword, SKOS.prefLabel, _lit(label.replace("_", " "), language)))
+            graph.add((keyword, SKOS.notation, Literal(label)))
+            graph.add((keyword, SKOS.inScheme, URIRef(base + "scheme")))
     for author in _scalars(attributes.get("authors")):
         if _text(author):
             graph.add((subject, SCHEMA.author, Literal(_text(author))))
@@ -261,7 +290,26 @@ def _describe_node(
     qid = _text(attributes.get("wikidata", ""))
     wikidata_ok = bool(_WIKIDATA_ID.fullmatch(qid))
     if wikidata_ok:
-        graph.add((subject, SKOS.closeMatch, URIRef("http://www.wikidata.org/entity/" + qid)))
+        graph.add((subject, RDFS.seeAlso, URIRef("http://www.wikidata.org/entity/" + qid)))
+
+    mappings = reviewed_mappings(attributes.get("external_mappings"))
+    if mappings and node.node_type in {*_NAVIGATION_TYPES, "redirect"}:
+        raise ValueError(f"non-concept node {node.id!r} cannot carry SKOS mappings")
+    for mapping in mappings:
+        predicate, target = URIRef(str(SKOS) + mapping.relation), URIRef(mapping.target)
+        graph.add((subject, predicate, target))
+        key = hashlib.sha256(f"{subject}\n{predicate}\n{target}".encode()).hexdigest()
+        statement = URIRef(base + "mapping/" + key)
+        for p, o in (
+            (RDF.type, RDF.Statement),
+            (RDF.subject, subject),
+            (RDF.predicate, predicate),
+            (RDF.object, target),
+            (DCTERMS.source, URIRef(mapping.evidence)),
+            (DCTERMS.description, _lit(mapping.rationale, language)),
+            (DCTERMS.date, Literal(mapping.reviewed_on, datatype=XSD.date)),
+        ):
+            graph.add((statement, p, o))
 
     for key in sorted(attributes):
         if key in _MAPPED_ATTRIBUTES and not (key == "wikidata" and qid and not wikidata_ok):
@@ -341,7 +389,7 @@ def _describe_dataset(
         )
         graph.add((dataset, DCTERMS.license, license_term))
         graph.add((scheme, DCTERMS.license, license_term))
-    for vocabulary in (SKOS, DCTERMS, SCHEMA, PROV):
+    for vocabulary in (SKOS, DCTERMS, SCHEMA, PROV, BIBO):
         graph.add((dataset, VOID.vocabulary, URIRef(str(vocabulary))))
     if entry.get("homepage"):
         graph.add((dataset, DCAT.landingPage, URIRef(str(entry["homepage"]))))

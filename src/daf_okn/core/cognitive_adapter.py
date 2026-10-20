@@ -525,6 +525,10 @@ def _coerce_attribute_value(value: Any) -> Any:
     """Coerce frontmatter scalars (YAML dates) to JSON-serialisable values."""
     if isinstance(value, (datetime, date)):
         return value.isoformat()
+    if isinstance(value, list):
+        return [_coerce_attribute_value(item) for item in value]
+    if isinstance(value, dict):
+        return {key: _coerce_attribute_value(item) for key, item in value.items()}
     return value
 
 
@@ -550,10 +554,22 @@ def _node_record_for(path: Path, root_dir: Path, frontmatter: dict[str, Any]) ->
     aliases = frontmatter_aliases(frontmatter)
     if aliases:
         attributes["aliases"] = aliases
-    for key in ("description", "complexity", "year", "journal", "doi", "wikidata"):
+    for key in (
+        "description",
+        "complexity",
+        "year",
+        "journal",
+        "doi",
+        "wikidata",
+        "definition",
+        "scope_note",
+    ):
         value = frontmatter.get(key)
         if value is not None and str(value).strip():
             attributes[key] = _coerce_attribute_value(value)
+
+    if "external_mappings" in frontmatter:
+        attributes["external_mappings"] = _coerce_attribute_value(frontmatter["external_mappings"])
 
     title = normalise_title(frontmatter.get("title")) or node_id
     redirect = _redirect_target(frontmatter)

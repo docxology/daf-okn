@@ -130,11 +130,14 @@ def test_node_fields_map_to_dcterms_skos_and_schema() -> None:
     assert {str(o) for o in graph.objects(fe, SKOS.altLabel)} == {"FE", "variational free energy"}
     assert (fe, DCTERMS.created, Literal("2024-01-02", datatype=XSD.date)) in graph
     assert (fe, DCTERMS.modified, Literal("2025-03-04", datatype=XSD.date)) in graph
-    assert {str(o) for o in graph.objects(fe, SCHEMA.keywords)} == {"inference", "maths"}
+    assert set(graph.objects(fe, SCHEMA.keywords)) == {
+        URIRef(BASE + "keyword/" + tag) for tag in ("inference", "maths")
+    }
     assert (fe, SCHEMA.author, Literal("A. Author")) in graph
     assert (fe, SCHEMA.datePublished, Literal("2022", datatype=XSD.gYear)) in graph
     assert (fe, SCHEMA.sameAs, URIRef("https://doi.org/10.1000/xyz%201")) in graph
-    assert (fe, SKOS.closeMatch, URIRef("http://www.wikidata.org/entity/Q42")) in graph
+    assert (fe, RDFS.seeAlso, URIRef("http://www.wikidata.org/entity/Q42")) in graph
+    assert not list(graph.triples((fe, SKOS.closeMatch, None)))
     assert not list(graph.triples((fe, SKOS.exactMatch, None)))
 
 
@@ -152,6 +155,100 @@ def test_unmapped_attributes_live_under_vocab() -> None:
     for predicate in vocab_predicates:
         assert (URIRef(predicate), RDF.type, RDF.Property) in graph
         assert (URIRef(predicate), RDFS.label, None) in graph
+
+
+def test_reviewed_mapping_has_reified_source_evidence() -> None:
+    mapping = {
+        "target": "http://purl.obolibrary.org/obo/CHEBI_17650",
+        "relation": "exactMatch",
+        "evidence": "https://www.ebi.ac.uk/chebi/CHEBI:17650",
+        "rationale": "Both denote the cortisol substance.",
+        "reviewed_on": "2026-10-20",
+    }
+    doc = GraphDocument(
+        name="demo",
+        nodes=[
+            NodeRecord(id="cortisol", title="Cortisol", attributes={"external_mappings": [mapping]})
+        ],
+    )
+    graph = build_rdf_graph(doc, namespace_base=BASE)
+    page, target = _page("cortisol"), URIRef(mapping["target"])
+    assert (page, SKOS.exactMatch, target) in graph
+    statement = next(graph.subjects(RDF.subject, page))
+    assert (statement, RDF.predicate, SKOS.exactMatch) in graph
+    assert (statement, RDF.object, target) in graph
+    assert (statement, DCTERMS.source, URIRef(mapping["evidence"])) in graph
+    assert (statement, DCTERMS.date, Literal("2026-10-20", datatype=XSD.date)) in graph
+    assert not list(graph.triples((page, URIRef(BASE + "vocab/external_mappings"), None)))
+    doc.nodes[0].node_type = "index"
+    with pytest.raises(ValueError, match="non-concept"):
+        build_rdf_graph(doc)
+
+
+def test_keyword_iris_are_declared_and_preserve_exact_source_tag() -> None:
+    doc = GraphDocument(
+        name="demo",
+        nodes=[
+            NodeRecord(id="a", title="A", attributes={"tags": ["model/fitting", "Café", "a b"]})
+        ],
+    )
+    graph = build_rdf_graph(doc, namespace_base=BASE)
+    for keyword in graph.objects(_page("a"), SCHEMA.keywords):
+        assert isinstance(keyword, URIRef)
+        assert (keyword, RDF.type, SKOS.Concept) in graph
+        assert (keyword, RDF.type, SCHEMA.DefinedTerm) in graph
+        assert (keyword, SKOS.notation, None) in graph
+    assert (
+        URIRef(BASE + "keyword/model%2Ffitting"),
+        SKOS.notation,
+        Literal("model/fitting"),
+    ) in graph
+
+
+def test_citation_predicates_preserve_direction() -> None:
+    assert relation_predicate("cited by", BASE) == URIRef("http://purl.org/ontology/bibo/citedBy")
+    assert relation_predicate("cites", BASE) == URIRef("http://purl.org/ontology/bibo/cites")
+    assert relation_predicate("sio:SIO_000233", BASE) == URIRef(
+        "http://semanticscience.org/resource/SIO_000233"
+    )
+
+
+def test_reviewed_keyword_terms_are_reused_directly() -> None:
+    doc = GraphDocument(
+        name="demo",
+        nodes=[
+            NodeRecord(
+                id="a", title="A", attributes={"tags": ["model_fitting", "computational_modeling"]}
+            )
+        ],
+    )
+    graph = build_rdf_graph(doc, namespace_base=BASE)
+    assert set(graph.objects(_page("a"), SCHEMA.keywords)) == {
+        URIRef("http://purl.obolibrary.org/obo/STATO_0000218"),
+        URIRef("http://purl.obolibrary.org/obo/NCIT_C16461"),
+    }
+    assert not any(str(s).startswith(BASE + "keyword/") for s in graph.subjects())
+
+
+def test_markdown_adapter_preserves_mapping_evidence_and_concept_scope(tmp_path: Path) -> None:
+    (tmp_path / "cortisol.md").write_text(
+        "---\ntitle: Cortisol\ndefinition: The cortisol chemical substance.\n"
+        "scope_note: Excludes the HPA system.\nexternal_mappings:\n"
+        "  - target: http://purl.obolibrary.org/obo/CHEBI_17650\n"
+        "    relation: exactMatch\n"
+        "    evidence: https://www.ebi.ac.uk/chebi/CHEBI:17650\n"
+        "    rationale: Both denote the same chemical substance.\n"
+        "    reviewed_on: 2026-10-20\n---\n"
+    )
+    document = build_cognitive_graph(tmp_path)
+    assert document.nodes[0].attributes["external_mappings"][0]["reviewed_on"] == "2026-10-20"
+    graph = build_rdf_graph(document, namespace_base=BASE)
+    assert (
+        _page("cortisol"),
+        SKOS.exactMatch,
+        URIRef("http://purl.obolibrary.org/obo/CHEBI_17650"),
+    ) in graph
+    assert (_page("cortisol"), SKOS.scopeNote, Literal("Excludes the HPA system.")) in graph
 
 
 def test_invalid_wikidata_id_falls_back_to_vocab() -> None:
@@ -229,7 +326,9 @@ def test_language_tag_applies_to_human_readable_literals() -> None:
     graph = build_rdf_graph(_doc(), namespace_base=BASE, language="en")
     fe = _page("maths/free_energy")
     assert (fe, SKOS.prefLabel, Literal("Free Energy", lang="en")) in graph
-    assert (fe, SCHEMA.keywords, Literal("maths")) in graph  # keywords stay plain
+    keyword = URIRef(BASE + "keyword/maths")
+    assert (fe, SCHEMA.keywords, keyword) in graph
+    assert (keyword, SKOS.prefLabel, Literal("maths", lang="en")) in graph
 
 
 @rdflib_parser_warnings

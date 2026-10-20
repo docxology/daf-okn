@@ -96,17 +96,24 @@ Following RENCI's guidance to reuse existing vocabularies, nodes and edges becom
 | --- | --- |
 | node | `schema:CreativeWork`; also `skos:Concept` (with `skos:prefLabel`, `skos:inScheme`) unless it is an `overview`/`index` page (`schema:CollectionPage`) |
 | title, `description`, `aliases` | `dcterms:title`, `dcterms:description`, `skos:altLabel` |
-| `created`, `updated`, `tags` | `dcterms:created`, `dcterms:modified`, `schema:keywords` |
-| `authors`, `year`, `doi`, `wikidata` | `schema:author`, `schema:datePublished`, `schema:sameAs`, `skos:closeMatch` |
+| `created`, `updated`, `tags` | `dcterms:created`, `dcterms:modified`, concept-valued `schema:keywords` |
+| `authors`, `year`, `doi`, `wikidata` | `schema:author`, `schema:datePublished`, `schema:sameAs`, discovery-only `rdfs:seeAlso` |
+| `definition`, `scope_note`, `external_mappings` | SKOS definition/scope note and explicit source-reviewed mappings with statement evidence |
 | relation `related` / `relates_to` | `skos:related` |
 | relation `part_of`, `organizes` | `dcterms:isPartOf`, `dcterms:hasPart` |
 | body `[[link]]` (origin `wikilink`) | `dcterms:references` |
+| `cited_by`, `cites` | `bibo:citedBy`, `bibo:cites`, preserving source direction |
 | any other relation, e.g. `implements` | `<base>relation/implements`, declared `rdfs:subPropertyOf skos:semanticRelation` with an `rdfs:label` |
 | any other node attribute | `<base>vocab/<key>` |
 
 Entity IRIs are `https://purl.org/okn/frink/kg/<shortname>/page/<node id>`; the graph also
 carries a `dcat:Dataset` / `void:Dataset` description and a small PROV-O activity. Output has no
 timestamps, so the same input always yields the same bytes.
+
+The [semantic export profile](docs/okn/cross-graph.md#semantic-export-profile)
+documents mapping validation, direct STATO/NCI keyword reuse and the boundary
+between discovery links and reviewed correspondences. The Markdown adapter
+preserves these records, including nested review dates, before RDF serialization.
 
 ### Relationship to the `cognitive` repository's exporter
 

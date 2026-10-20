@@ -43,7 +43,7 @@ def markdown_report(rows: list[JoinedRow], observed_at: str) -> str:
         f"| Matched concept pages | {len({row['concept'] for row in rows})} |",
         f"| Labeled external OBO terms | {len({row['external'] for row in rows})} |",
         "",
-        "The first edge is a candidate `skos:closeMatch` from an explanatory page",
+        "The first edge is the local query's selected mapping from a concept",
         "to Wikidata. The second is the mapping graph's `skos:exactMatch` to an",
         "OBO identifier. Joining these edges does not establish identity between",
         "the page and the ontology class. Labels are discovery signposts, not",

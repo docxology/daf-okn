@@ -3,7 +3,7 @@ import subprocess
 
 import pytest
 from rdflib import Dataset, Literal, URIRef
-from rdflib.namespace import DCTERMS
+from rdflib.namespace import DCTERMS, RDF, SKOS, XSD
 
 from daf_okn.cli import main
 from daf_okn.core import rdf_submission as submission
@@ -40,6 +40,7 @@ def source_repo(tmp_path):
         "submission_criteria.md",
         "interoperability.md",
         "landing_zone.md",
+        "alignment-review.md",
     ):
         (docs / name).write_text("Documentation\n")
     (root / "LICENSE-KNOWLEDGE-BASE.md").write_text(LICENSE)
@@ -48,7 +49,13 @@ def source_repo(tmp_path):
     )
     queries = docs / "queries"
     queries.mkdir()
-    for name in ("concept_mappings.rq", "citation_identifiers.rq", "cross_graph_obo.rq"):
+    for name in (
+        "concept_mappings.rq",
+        "citation_identifiers.rq",
+        "cross_graph_obo.rq",
+        "mapping_evidence.rq",
+        "keyword_concepts.rq",
+    ):
         (queries / name).write_text("SELECT ?s WHERE { ?s ?p ?o }\n")
     export = root / "output/okn"
     export.mkdir(parents=True)
@@ -84,7 +91,7 @@ def test_bundle_preserves_canonical_graph_and_verifies_actual_files(tmp_path):
         root / "output/okn/cognitive-kb.nq"
     ).read_bytes()
     assert (out / "registry/docs/registry/kgs/cognitive-kb.md").is_file()
-    assert len(list((out / "registry/docs/registry/queries/cognitive-kb").glob("*.rq"))) == 3
+    assert len(list((out / "registry/docs/registry/queries/cognitive-kb").glob("*.rq"))) == 5
     query = out / "registry/docs/registry/queries/cognitive-kb/cross_graph_obo.rq"
     assert "#+ tags:\n#+   - federation\n\n" in query.read_text()
     assert main(["bundle-rdf", "--output", str(out), "--check"]) == 0
@@ -178,3 +185,70 @@ def test_modified_source_and_additional_graph_are_rejected(tmp_path):
     dataset.serialize(export / "cognitive-kb.nq", format="nquads")
     refresh_manifest(export)
     assert any("unexpected named graph" in item for item in submission.validate_export(export))
+
+
+@pytest.mark.parametrize(
+    "failure",
+    [
+        None,
+        "source",
+        "date",
+        "rationale",
+        "type",
+        "endpoint",
+        "statement",
+        "literal_keyword",
+        "local_keyword",
+        "custom_citation",
+        "bad_date",
+        "bad_evidence",
+    ],
+)
+def test_bundle_rejects_semantic_regressions_even_with_valid_hashes(tmp_path, failure):
+    root = source_repo(tmp_path)
+    export = root / "output/okn"
+    dataset = Dataset().parse(export / "cognitive-kb.nq", format="nquads")
+    graph = dataset.graph(URIRef(GRAPH))
+    page, target, statement = (
+        URIRef(GRAPH + suffix) for suffix in ("/page/example", "/external", "/mapping/review")
+    )
+    graph.add((page, RDF.type, SKOS.Concept))
+    graph.add((page, SKOS.exactMatch, target))
+    for p, o in (
+        (RDF.type, RDF.Statement),
+        (RDF.subject, page),
+        (RDF.predicate, SKOS.exactMatch),
+        (RDF.object, target),
+        (DCTERMS.source, URIRef("https://example.org/definition")),
+        (DCTERMS.description, Literal("Same defined concept.")),
+        (DCTERMS.date, Literal("2026-10-20", datatype=XSD.date)),
+    ):
+        graph.add((statement, p, o))
+    if failure in {"source", "date", "rationale"}:
+        predicate = {
+            "source": DCTERMS.source,
+            "date": DCTERMS.date,
+            "rationale": DCTERMS.description,
+        }[failure]
+        graph.remove((statement, predicate, None))
+    elif failure == "type":
+        graph.remove((page, RDF.type, SKOS.Concept))
+    elif failure == "endpoint":
+        graph.add((page, SKOS.closeMatch, Literal("bad target")))
+    elif failure == "statement":
+        graph.remove((statement, RDF.type, RDF.Statement))
+    elif failure == "literal_keyword":
+        graph.add((page, URIRef("https://schema.org/keywords"), Literal("model_fitting")))
+    elif failure == "local_keyword":
+        graph.add((page, URIRef("https://schema.org/keywords"), URIRef(GRAPH + "/keyword/new")))
+    elif failure == "custom_citation":
+        graph.add((page, URIRef(GRAPH + "/relation/cited_by"), target))
+    elif failure == "bad_date":
+        graph.set((statement, DCTERMS.date, Literal("2026-10-20")))
+    elif failure == "bad_evidence":
+        graph.set((statement, DCTERMS.source, URIRef("file:///evidence")))
+    dataset.serialize(export / "cognitive-kb.nq", format="nquads")
+    graph.serialize(export / "cognitive-kb.ttl", format="turtle")
+    refresh_manifest(export)
+    errors = submission.validate_export(export, root)
+    assert bool(errors) == (failure is not None)

@@ -256,7 +256,10 @@ def _run(args: JoinOptions) -> None:
         subjects = sorted(
             {
                 str(o)
-                for _, _, o in local.triples((None, URIRef(PREFIXES["skos"] + "closeMatch"), None))
+                for relation in ("closeMatch", "exactMatch")
+                for _, _, o in local.triples((None, URIRef(PREFIXES["skos"] + relation), None))
+                if isinstance(o, URIRef)
+                and re.fullmatch(r"http://www\.wikidata\.org/entity/Q[1-9][0-9]*", str(o))
             }
         )
         if not subjects:
