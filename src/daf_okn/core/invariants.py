@@ -14,6 +14,7 @@ Both are pure functions over the document; no I/O, no network access.
 
 from __future__ import annotations
 
+from collections import Counter
 from typing import TYPE_CHECKING, Any
 
 import networkx as nx
@@ -62,21 +63,33 @@ def graph_stats(doc: GraphDocument) -> dict[str, Any]:
     """Return a small summary dict for ``doc``.
 
     Keys: ``node_count`` / ``edge_count`` (document record counts),
-    ``density`` (directed simple-graph interpretation, ``m / (n * (n - 1))``,
-    ``0.0`` when fewer than two nodes), ``directed`` (always ``True`` — stats
+    ``projected_node_count`` / ``projected_edge_count`` count the directed
+    simple projection, which also determines ``density`` and connectivity.
+    ``statement_count`` counts distinct source/relation/target triples;
+    ``duplicate_statement_count`` counts repeated triples irrespective of origin.
+    ``parallel_statement_count`` counts distinct triples lost on projection.
+    ``density`` is ``m / (n * (n - 1))`` (0 when fewer than two nodes);
+    ``directed`` (always ``True`` — stats
     use the directed interpretation), and ``component_count`` (weakly
     connected components of the directed projection).
     """
     node_count = len(doc.nodes)
     edge_count = len(doc.edges)
-    density = (edge_count / (node_count * (node_count - 1))) if node_count > 1 else 0.0
-    component_count = (
-        nx.number_weakly_connected_components(doc.to_networkx(directed=True)) if node_count else 0
-    )
+    graph = doc.to_networkx(directed=True)
+    statements = {(edge.source, edge.relation, edge.target) for edge in doc.edges}
+    projected_edge_count = graph.number_of_edges()
+    component_count = nx.number_weakly_connected_components(graph) if graph else 0
     return {
         "node_count": node_count,
         "edge_count": edge_count,
-        "density": density,
+        "projected_node_count": graph.number_of_nodes(),
+        "projected_edge_count": projected_edge_count,
+        "statement_count": len(statements),
+        "duplicate_statement_count": edge_count - len(statements),
+        "parallel_statement_count": len(statements) - projected_edge_count,
+        "relation_counts": dict(sorted(Counter(edge.relation for edge in doc.edges).items())),
+        "node_type_counts": dict(sorted(Counter(node.node_type for node in doc.nodes).items())),
+        "density": nx.density(graph),
         "directed": True,
         "component_count": component_count,
     }

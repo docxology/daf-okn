@@ -42,7 +42,7 @@ from daf_okn.analysis.graph_metrics import compute_metrics
 from daf_okn.dashboard.dashboard_payload import build_payload
 
 doc = GraphDocument.load_json("output/data/cognitive_kg.json")
-metrics = compute_metrics(doc.to_networkx())
+metrics = compute_metrics(doc)
 payload = build_payload(doc, metrics)
 ```
 

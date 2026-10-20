@@ -6,6 +6,11 @@ This package computes structural metrics over `GraphDocument` projections and
 persists the JSON analysis report. Scripts delegate here so the analysis
 workflow is testable without shell logic.
 
+Metrics distinguish original edge records, distinct statements and directed
+simple connectivity. Density and centrality use the simple projection;
+`GraphDocument.to_multidigraph()` preserves every predicate/provenance record
+for inspection. See [RDF identity and measurement](../../../docs/okn/graph-methods.md).
+
 ## Files
 
 | File | Role |

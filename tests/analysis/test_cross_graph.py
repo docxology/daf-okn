@@ -289,3 +289,189 @@ def test_invalid_or_non_select_join_queries_report_typed_errors(tmp_path, query)
     path.write_text(query)
     with pytest.raises(join.JoinError):
         join.write_results(Dataset(), path, (tmp_path / "out", "2026-10-13"))
+
+
+def test_local_export_rejects_foreign_named_graph_even_when_cognitive_exists(tmp_path):
+    source = local_export(tmp_path)
+    dataset = Dataset().parse(source, format="nquads")
+    dataset.graph(URIRef(join.UBERGRAPH)).add((URIRef(TERM), URIRef(join.LABEL), Literal("forged")))
+    dataset.serialize(source, format="nquads")
+    with pytest.raises(join.JoinError, match="graph"):
+        join.local_dataset(source)
+
+
+@pytest.mark.parametrize("fault", ["count", "duplicate", "extra", "symlink"])
+def test_replay_rejects_altered_inventory_and_metadata(tmp_path, fault):
+    source = local_export(tmp_path)
+    out = tmp_path / "capture"
+    with endpoint_server() as endpoint:
+        assert run_cli(arguments(source, out) + ["--endpoint", endpoint]) == 0
+    manifest = json.loads((out / "manifest.json").read_text())
+    if fault == "count":
+        manifest["requested_wikidata_keys"] = 999
+    elif fault == "duplicate":
+        manifest["captures"].append(manifest["captures"][0])
+    elif fault == "extra":
+        (out / "unrecorded.json").write_text("{}")
+    else:
+        response = out / "identifier-mappings-0000.json"
+        response.rename(tmp_path / "preserved-response.json")
+        response.symlink_to(tmp_path / "preserved-response.json")
+    (out / "manifest.json").write_text(json.dumps(manifest))
+    assert run_cli(arguments(source, tmp_path / "replay") + ["--replay", str(out)]) == 1
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [b"{}", b"[]", b"null", b"x" * (join.MAX_BYTES + 1)],
+    ids=["object", "list", "null", "oversize"],
+)
+def test_response_parser_rejects_malformed_or_oversized_documents(tmp_path, raw):
+    with pytest.raises(join.JoinError):
+        join.response_triples(raw)
+
+
+def legacy_capture(snapshot, destination):
+    manifest = json.loads((snapshot / "manifest.json").read_text())
+    manifest.pop("schema_version")
+    manifest.pop("files")
+    (snapshot / "join-query.rq").rename(destination)
+    (snapshot / "manifest.json").write_text(json.dumps(manifest))
+    return manifest
+
+
+def test_original_capture_schema_remains_readable(tmp_path):
+    source = local_export(tmp_path)
+    snapshot = tmp_path / "capture"
+    with endpoint_server() as endpoint:
+        assert run_cli(arguments(source, snapshot) + ["--endpoint", endpoint]) == 0
+    legacy_capture(snapshot, tmp_path / "preserved-query.rq")
+    replay = tmp_path / "replay"
+    assert run_cli(arguments(source, replay) + ["--replay", str(snapshot)]) == 0
+    assert json.loads((replay / "join-results.json").read_text())["rows"][0]["concept"] == PAGE
+
+
+@pytest.mark.parametrize(
+    "fault", ["results", "query", "metadata", "files", "schema", "missing_capture"]
+)
+def test_v2_capture_binds_results_join_query_and_manifest_metadata(tmp_path, fault):
+    source = local_export(tmp_path)
+    snapshot = tmp_path / "capture"
+    with endpoint_server() as endpoint:
+        assert run_cli(arguments(source, snapshot) + ["--endpoint", endpoint]) == 0
+    manifest = json.loads((snapshot / "manifest.json").read_text())
+    if fault in {"results", "query"}:
+        path = snapshot / ("join-results.json" if fault == "results" else "join-query.rq")
+        path.write_bytes(path.read_bytes() + b"\n")
+    elif fault == "metadata":
+        manifest["observed_at"] = "2000-01-01T00:00:00+00:00"
+    elif fault == "files":
+        del manifest["files"]["join-results.md"]
+    elif fault == "schema":
+        manifest["schema_version"] = 999
+    else:
+        manifest["captures"].pop()
+    (snapshot / "manifest.json").write_text(json.dumps(manifest))
+    assert run_cli(arguments(source, tmp_path / "replay") + ["--replay", str(snapshot)]) == 1
+
+
+def test_legacy_replay_requires_even_empty_response_batches(tmp_path):
+    source = local_export(tmp_path)
+    dataset = Dataset().parse(source, format="nquads")
+    graph = dataset.graph(URIRef(join.GRAPH))
+    for number in range(1, 102):
+        graph.add(
+            (URIRef(PAGE), URIRef(join.EXACT), URIRef(f"http://www.wikidata.org/entity/Q{number}"))
+        )
+    dataset.serialize(source, format="nquads")
+    snapshot = tmp_path / "capture"
+    with endpoint_server() as endpoint:
+        assert run_cli(arguments(source, snapshot) + ["--endpoint", endpoint]) == 0
+    manifest = legacy_capture(snapshot, tmp_path / "preserved-query.rq")
+    assert manifest["requested_wikidata_keys"] == 102
+    missing = manifest["captures"].pop(1)
+    for field in ("query_file", "response_file"):
+        path = snapshot / missing[field]
+        path.rename(tmp_path / path.name)
+    (snapshot / "manifest.json").write_text(json.dumps(manifest))
+    assert run_cli(arguments(source, tmp_path / "replay") + ["--replay", str(snapshot)]) == 1
+
+
+@pytest.mark.parametrize("subjects", [[], [WD, WD], [WD] * 101])
+def test_capture_query_requires_bounded_nonempty_unique_subjects(subjects):
+    with pytest.raises(join.JoinError):
+        join.query_for(join.MAPPINGS, subjects)
+
+
+def test_query_cannot_present_constant_rows_as_a_successful_join(tmp_path):
+    source = local_export(tmp_path)
+    query = tmp_path / "forged-query.rq"
+    values = {
+        "concept": PAGE,
+        "wikidata": WD,
+        "external": TERM,
+        "source": "https://example.org/cortisol",
+    }
+    query.write_text(
+        "SELECT "
+        + " ".join(f"(<{value}> AS ?{key})" for key, value in values.items())
+        + ' ("Cortisol" AS ?label) ("invented" AS ?externalLabel) WHERE {}'
+    )
+    with pytest.raises(join.JoinError, match="three named source graphs"):
+        join.write_results(join.local_dataset(source), query, (tmp_path / "out", "2026-10-20"))
+
+
+def test_rehashed_result_changes_still_fail_recomputation(tmp_path):
+    source = local_export(tmp_path)
+    snapshot = tmp_path / "capture"
+    with endpoint_server() as endpoint:
+        assert run_cli(arguments(source, snapshot) + ["--endpoint", endpoint]) == 0
+    path = snapshot / "join-results.json"
+    result = json.loads(path.read_text())
+    result["joined_rows"] = 999
+    path.write_text(json.dumps(result, indent=2) + "\n")
+    manifest = json.loads((snapshot / "manifest.json").read_text())
+    manifest["files"]["join-results.json"] = join.digest(path.read_bytes())
+    (snapshot / "manifest.json").write_text(json.dumps(manifest))
+    assert run_cli(arguments(source, tmp_path / "replay") + ["--replay", str(snapshot)]) == 1
+
+
+def test_replay_cannot_overwrite_its_original_capture(tmp_path):
+    source = local_export(tmp_path)
+    snapshot = tmp_path / "capture"
+    with endpoint_server() as endpoint:
+        assert run_cli(arguments(source, snapshot) + ["--endpoint", endpoint]) == 0
+    original = (snapshot / "manifest.json").read_bytes()
+    assert run_cli(arguments(source, snapshot) + ["--replay", str(snapshot)]) == 1
+    assert (snapshot / "manifest.json").read_bytes() == original
+
+
+@pytest.mark.parametrize(
+    "fault", ["bindings", "binding", "value", "language", "datatype", "both", "duplicate_json"]
+)
+def test_response_schema_rejects_malformed_terms_without_rdflib_fallback(fault):
+    binding = {
+        "s": {"type": "uri", "value": WD},
+        "p": {"type": "uri", "value": join.EXACT},
+        "o": {"type": "literal", "value": "label"},
+    }
+    payload = {"head": {"vars": ["s", "p", "o"]}, "results": {"bindings": [binding]}}
+    if fault == "bindings":
+        payload["results"]["bindings"] = {}
+    elif fault == "binding":
+        binding["extra"] = {"type": "uri", "value": TERM}
+    elif fault == "value":
+        binding["o"]["value"] = 42
+    elif fault == "language":
+        binding["o"]["xml:lang"] = "bad language"
+    elif fault == "datatype":
+        binding["o"]["datatype"] = None
+    elif fault == "both":
+        binding["o"].update(
+            {"datatype": "http://www.w3.org/2001/XMLSchema#string", "xml:lang": "en"}
+        )
+    raw = json.dumps(payload).encode()
+    if fault == "duplicate_json":
+        raw = b'{"head":{},"head":{},"results":{}}'
+    with pytest.raises(join.JoinError):
+        join.response_triples(raw)

@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from datetime import date
+from ipaddress import ip_address
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -23,12 +24,43 @@ class Mapping:
 
 
 def checked_iri(value: Any) -> str:
-    """Require an absolute HTTP(S) IRI safe for RDF serialization."""
-    if not isinstance(value, str) or re.search(r'[\s<>"{}|^`\\\x00-\x1f]', value):
+    """Require an HTTP(S) IRI with a DNS/IP host, valid port and escapes.
+
+    This local export profile excludes user information and encoded hostnames.
+    Unicode DNS names and paths are retained verbatim after host validation.
+    """
+    if not isinstance(value, str) or re.search(
+        r'[\s<>"{}|^`\\\x00-\x1f\x7f-\x9f\ud800-\udfff]', value
+    ):
         raise ValueError(f"invalid mapping IRI: {value!r}")
-    parsed = urlsplit(value)
-    if parsed.scheme not in {"http", "https"} or not parsed.hostname or parsed.username:
-        raise ValueError(f"invalid mapping IRI: {value!r}")
+    try:
+        parsed = urlsplit(value)
+        host = parsed.hostname
+        if (
+            parsed.scheme not in {"http", "https"}
+            or not host
+            or "@" in parsed.netloc
+            or "%" in host
+            or parsed.netloc.endswith(":")
+            or (":" in host and not re.fullmatch(r"\[[^\]]+\](?::[0-9]+)?", parsed.netloc))
+            or re.search(r"%(?![0-9a-fA-F]{2})", value)
+        ):
+            raise ValueError("invalid authority or escapes")
+        # WHY: urlsplit accepts malformed ports until the port property is read.
+        port = parsed.port
+        if port is not None and not 1 <= port <= 65535:
+            raise ValueError("invalid port")
+        if ":" in host or re.fullmatch(r"[0-9.]+", host):
+            ip_address(host)
+        else:
+            ascii_host = (host[:-1] if host.endswith(".") else host).encode("idna").decode("ascii")
+            if len(ascii_host) > 253 or any(
+                not re.fullmatch(r"[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?", label)
+                for label in ascii_host.split(".")
+            ):
+                raise ValueError("invalid DNS hostname")
+    except ValueError as error:
+        raise ValueError(f"invalid mapping IRI: {value!r}: {error}") from error
     return value
 
 

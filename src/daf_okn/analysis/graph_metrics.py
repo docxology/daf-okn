@@ -15,6 +15,8 @@ from typing import TYPE_CHECKING, Any
 
 import networkx as nx
 
+from ..core.invariants import graph_stats
+
 if TYPE_CHECKING:  # pragma: no cover — typing-only import to avoid a cycle
     from ..core.graph import GraphDocument
 
@@ -106,9 +108,14 @@ def compute_metrics(
         ``density``, ``weakly_connected_components``,
         ``strongly_connected_components``, ``mean_degree``, ``triangles``
         (undirected projection), ``top_central_nodes``) plus the optional
-        centrality mappings.
+        centrality mappings. Record, distinct statement and collapsed parallel
+        counts are reported separately from projected ``edge_count``; relation
+        and node-type counts retain the document's typed information.
     """
+    if isinstance(top_k, bool) or not isinstance(top_k, int) or top_k < 0:
+        raise ValueError("top_k must be a nonnegative integer")
     graph = doc.to_networkx(directed=True)
+    stats = graph_stats(doc)
     node_count = graph.number_of_nodes()
     edge_count = graph.number_of_edges()
     degree = dict(graph.degree())
@@ -124,6 +131,17 @@ def compute_metrics(
         ),
         "mean_degree": (sum(degree.values()) / node_count) if node_count else 0.0,
         "triangles": triangle_count(graph),
+        "edge_record_count": stats["edge_count"],
+        **{
+            key: stats[key]
+            for key in (
+                "statement_count",
+                "duplicate_statement_count",
+                "parallel_statement_count",
+                "relation_counts",
+                "node_type_counts",
+            )
+        },
     }
 
     if centralities:

@@ -20,6 +20,7 @@ BOB = "https://okn.example.org/entity/bob"
 FOAF_KNOWS = "http://xmlns.com/foaf/0.1/knows"
 FOAF_AGE = "http://xmlns.com/foaf/0.1/age"
 XSD_INTEGER = "http://www.w3.org/2001/XMLSchema#integer"
+INTEGER_LITERAL = '"42"^^<' + XSD_INTEGER + ">"
 
 
 def _sample_document() -> GraphDocument:
@@ -243,25 +244,71 @@ class TestToNetworkx:
 class TestBindingsToGraph:
     """``bindings_to_graph`` on the standard SPARQL JSON result shape."""
 
+    def test_distinct_rdf_terms_and_predicate_namespaces_survive(self) -> None:
+        """Equal lexical forms do not identify language/datatype/URI terms."""
+        objects = [
+            {"type": "uri", "value": ALICE},
+            {"type": "literal", "value": ALICE},
+            {"type": "literal", "value": "same", "xml:lang": "en"},
+            {"type": "literal", "value": "same", "xml:lang": "fr"},
+            {"type": "literal", "value": "same", "datatype": XSD_INTEGER},
+            {"type": "bnode", "value": "same"},
+        ]
+        result = {
+            "head": {"vars": ["s", "p", "o"]},
+            "results": {
+                "bindings": [
+                    {
+                        "s": {"type": "uri", "value": BOB},
+                        "p": {"type": "uri", "value": predicate},
+                        "o": obj,
+                    }
+                    for obj in objects
+                    for predicate in ("https://one.example/p", "https://two.example/p")
+                ]
+            },
+        }
+        doc = bindings_to_graph(result, "identity")
+        assert len(doc.nodes) == 7
+        assert len(doc.edges) == 12
+        assert {edge.relation for edge in doc.edges} == {
+            "https://one.example/p",
+            "https://two.example/p",
+        }
+
+    def test_lossless_projection_preserves_parallel_records(self) -> None:
+        """The multigraph retains predicate/origin records and direction."""
+        doc = _sample_document()
+        doc.edges.extend([EdgeRecord("a", "b", "different"), EdgeRecord("a", "b", "knows")])
+        graph = doc.to_multidigraph()
+        assert isinstance(graph, nx.MultiDiGraph)
+        assert graph.number_of_edges() == 4
+        assert [data["relation"] for data in graph["a"]["b"].values()] == [
+            "knows",
+            "different",
+            "knows",
+        ]
+        assert not graph.has_edge("b", "a")
+
     def test_uri_and_literal_objects(self) -> None:
         doc = bindings_to_graph(_sparql_result(), "okn-sample")
-        assert {node.id for node in doc.nodes} == {ALICE, BOB, "42"}
+        assert {node.id for node in doc.nodes} == {ALICE, BOB, INTEGER_LITERAL}
 
         by_id = {node.id: node for node in doc.nodes}
         assert by_id[ALICE].title == "alice"
         assert by_id[ALICE].node_type == "uri"
         assert by_id[BOB].node_type == "uri"
-        literal = by_id["42"]
+        literal = by_id[INTEGER_LITERAL]
         assert literal.node_type == "literal"
         assert literal.title == "42"
         assert literal.attributes == {"datatype": XSD_INTEGER}
 
-    def test_edges_use_local_predicate_names(self) -> None:
+    def test_edges_preserve_full_predicate_iris(self) -> None:
         doc = bindings_to_graph(_sparql_result(), "okn-sample")
         assert len(doc.edges) == 2, "exact duplicate triple must collapse"
         relations = {(edge.source, edge.target, edge.relation) for edge in doc.edges}
-        assert (ALICE, BOB, "knows") in relations
-        assert (BOB, "42", "age") in relations
+        assert (ALICE, BOB, FOAF_KNOWS) in relations
+        assert (BOB, INTEGER_LITERAL, FOAF_AGE) in relations
         assert all(edge.origin == "explicit" for edge in doc.edges)
 
     def test_provenance_metadata(self) -> None:
@@ -284,8 +331,8 @@ class TestBindingsToGraph:
         ]
         doc = bindings_to_graph(result, "positional")
         assert {(e.source, e.target, e.relation) for e in doc.edges} == {
-            (ALICE, BOB, "knows"),
-            (BOB, "42", "age"),
+            (ALICE, BOB, FOAF_KNOWS),
+            (BOB, INTEGER_LITERAL, FOAF_AGE),
         }
 
     def test_unbound_object_skips_binding(self) -> None:
@@ -315,13 +362,13 @@ class TestBindingsToGraph:
             },
         }
         doc = bindings_to_graph(result, "lang")
-        literal = next(node for node in doc.nodes if node.id == "bonjour")
+        literal = next(node for node in doc.nodes if node.id == '"bonjour"@fr')
         assert literal.node_type == "literal"
         assert literal.title == "bonjour"
         assert literal.attributes == {"xml:lang": "fr"}
 
-    def test_bnode_and_missing_type_terms(self) -> None:
-        """Blank nodes stay ``uri`` nodes; a missing ``type`` defaults to uri."""
+    def test_bnode_identity_and_missing_type_rejection(self) -> None:
+        """Blank-node ids are distinct from IRIs; missing term types are invalid."""
         result = {
             "head": {"vars": ["s", "p", "o"]},
             "results": {
@@ -329,15 +376,116 @@ class TestBindingsToGraph:
                     {
                         "s": {"type": "bnode", "value": "b0"},
                         "p": {"type": "uri", "value": FOAF_KNOWS},
-                        "o": {"value": "42", "datatype": XSD_INTEGER},
+                        "o": {"type": "uri", "value": BOB},
                     }
                 ]
             },
         }
         doc = bindings_to_graph(result, "bnode")
         by_id = {node.id: node for node in doc.nodes}
-        assert by_id["b0"].node_type == "uri"
-        assert by_id["b0"].title == "b0"
-        assert by_id["42"].node_type == "uri"
-        assert by_id["42"].title == "42"
-        assert by_id["42"].attributes == {}
+        assert by_id["_:b0"].node_type == "bnode"
+        assert by_id["_:b0"].title == "b0"
+        result["results"]["bindings"][0]["o"] = {"value": "42", "datatype": XSD_INTEGER}
+        with pytest.raises(ValueError, match="type"):
+            bindings_to_graph(result, "missing-type")
+
+    @pytest.mark.parametrize(
+        "term",
+        [
+            None,
+            {},
+            {"type": "literal", "value": 4},
+            {"type": [], "value": "x"},
+            {"type": "uri", "value": "relative"},
+            {"type": "uri", "value": "http://x:bad"},
+            {"type": "uri", "value": "http:///a"},
+            {"type": "uri", "value": "https://[broken"},
+            {"type": "uri", "value": ALICE, "datatype": XSD_INTEGER},
+            {"type": "bnode", "value": ""},
+            {"type": "bnode", "value": "has space"},
+            {"type": "literal", "value": "x", "datatype": "relative"},
+            {"type": "literal", "value": "x", "xml:lang": 3},
+            {"type": "literal", "value": "x", "xml:lang": "bad space"},
+            {"type": "literal", "value": "x", "xml:lang": "en", "datatype": XSD_INTEGER},
+            {"type": "typed-literal", "value": "x"},
+        ],
+    )
+    def test_malformed_bound_terms_are_rejected(self, term) -> None:
+        """Present malformed terms must fail instead of disappearing as unbound."""
+        result = _sparql_result()
+        result["results"]["bindings"][0]["o"] = term
+        with pytest.raises(ValueError):
+            bindings_to_graph(result, "malformed")
+
+    @pytest.mark.parametrize(
+        "result",
+        [
+            None,
+            [],
+            {},
+            {"head": []},
+            {"head": {"vars": "spo"}, "results": {"bindings": []}},
+            {"head": {"vars": ["s", "p", "o"]}, "results": {"bindings": None}},
+            {"head": {"vars": ["s", "s", "o"]}, "results": {"bindings": []}},
+            {"head": {"vars": ["s", [], "o"]}, "results": {"bindings": []}},
+            {"head": {"vars": ["s", "p", "o"]}, "results": {"bindings": [[]]}},
+        ],
+    )
+    def test_malformed_select_documents_are_rejected(self, result) -> None:
+        """Malformed SELECT envelopes and duplicate roles cannot produce a graph."""
+        with pytest.raises(ValueError):
+            bindings_to_graph(result, "malformed-result")
+
+    @pytest.mark.parametrize("role", ["s", "p"])
+    def test_triple_roles_reject_literal_subject_or_predicate(self, role) -> None:
+        """RDF subjects and predicates cannot be literal terms."""
+        result = _sparql_result()
+        result["results"]["bindings"][0][role] = {"type": "literal", "value": "invalid"}
+        with pytest.raises(ValueError):
+            bindings_to_graph(result, "bad-role")
+
+    def test_partial_role_aliases_do_not_reuse_the_predicate_as_subject(self) -> None:
+        """Named roles are reserved before positional roles are assigned."""
+        result = {
+            "head": {"vars": ["p", "x", "y"]},
+            "results": {
+                "bindings": [
+                    {
+                        "p": {"type": "uri", "value": FOAF_KNOWS},
+                        "x": {"type": "uri", "value": ALICE},
+                        "y": {"type": "uri", "value": BOB},
+                    }
+                ]
+            },
+        }
+        doc = bindings_to_graph(result, "partial-alias")
+        assert doc.edges == [EdgeRecord(ALICE, BOB, FOAF_KNOWS)]
+
+    def test_literal_identity_normalizes_language_case_and_plain_string_datatype(self) -> None:
+        """RDF 1.1 language case and simple/xsd:string forms identify the same terms."""
+        objects = [
+            {"type": "literal", "value": "hello", "xml:lang": language} for language in ("EN", "en")
+        ] + [
+            {"type": "literal", "value": "hello"},
+            {
+                "type": "typed-literal",
+                "value": "hello",
+                "datatype": "http://www.w3.org/2001/XMLSchema#string",
+            },
+        ]
+        result = {
+            "head": {"vars": ["s", "p", "o"]},
+            "results": {
+                "bindings": [
+                    {
+                        "s": {"type": "uri", "value": ALICE},
+                        "p": {"type": "uri", "value": FOAF_KNOWS},
+                        "o": obj,
+                    }
+                    for obj in objects
+                ]
+            },
+        }
+        doc = bindings_to_graph(result, "canonical-terms")
+        assert {node.id for node in doc.nodes} == {ALICE, '"hello"', '"hello"@en'}
+        assert len(doc.edges) == 2

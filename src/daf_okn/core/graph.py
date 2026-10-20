@@ -23,10 +23,12 @@ only when called.
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Iterable
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Literal, overload
+from urllib.parse import urlsplit
 
 import networkx as nx
 
@@ -57,7 +59,7 @@ class EdgeRecord:
     Attributes:
         source: Id of the source node (must exist in the document's nodes).
         target: Id of the target node (must exist in the document's nodes).
-        relation: Relation label (local part of a predicate IRI for SPARQL data).
+        relation: Relation label, or the full predicate IRI for SPARQL data.
         origin: Provenance tag, e.g. ``"explicit"`` or ``"inferred"``.
     """
 
@@ -116,6 +118,8 @@ class GraphDocument:
         ``attributes`` (canonical fields win on key collision). Edge attributes
         are ``{"relation", "origin"}``. Dangling edge endpoints are materialized
         as bare nodes by networkx; use :meth:`validate` to detect them.
+        Parallel records collapse to one edge, whose attributes come from the
+        last record. Use :meth:`to_multidigraph` to preserve every record.
         """
         graph: nx.DiGraph | nx.Graph = nx.DiGraph() if directed else nx.Graph()
         for node in self.nodes:
@@ -125,6 +129,24 @@ class GraphDocument:
             )
         for edge in self.edges:
             graph.add_edge(edge.source, edge.target, relation=edge.relation, origin=edge.origin)
+        return graph
+
+    def to_multidigraph(self) -> nx.MultiDiGraph:
+        """Preserve every directed edge record, including parallel predicates.
+
+        Integer edge keys are the original record positions, so duplicates and
+        differing provenance remain inspectable. Node attributes follow the
+        same canonical-field precedence as :meth:`to_networkx`.
+        """
+        graph: nx.MultiDiGraph = nx.MultiDiGraph()
+        for node in self.nodes:
+            graph.add_node(
+                node.id, **{**node.attributes, "title": node.title, "node_type": node.node_type}
+            )
+        for key, edge in enumerate(self.edges):
+            graph.add_edge(
+                edge.source, edge.target, key=key, relation=edge.relation, origin=edge.origin
+            )
         return graph
 
     def to_dict(self) -> dict[str, Any]:
@@ -215,9 +237,13 @@ def _resolve_sparql_roles(variables: Iterable[str]) -> tuple[str, str, str]:
     back to positional order (first three variables).
     """
     variables = list(variables)
-    if len(variables) < 3:
+    if (
+        len(variables) < 3
+        or any(not isinstance(variable, str) or not variable for variable in variables)
+        or len(set(variables)) != len(variables)
+    ):
         raise ValueError(
-            "SPARQL result must select at least three variables "
+            "SPARQL result must select at least three variables with distinct nonempty names "
             f"(subject, predicate, object); got {variables!r}"
         )
 
@@ -228,38 +254,70 @@ def _resolve_sparql_roles(variables: Iterable[str]) -> tuple[str, str, str]:
                 return lowered[alias]
         return None
 
-    subject = _pick(_SUBJECT_ALIASES) or variables[0]
-    predicate = _pick(_PREDICATE_ALIASES) or variables[1]
-    obj = _pick(_OBJECT_ALIASES) or variables[2]
-    return subject, predicate, obj
+    roles = [_pick(aliases) for aliases in (_SUBJECT_ALIASES, _PREDICATE_ALIASES, _OBJECT_ALIASES)]
+    remaining = iter(variable for variable in variables if variable not in roles)
+    resolved = [role if role is not None else next(remaining) for role in roles]
+    return resolved[0], resolved[1], resolved[2]
 
 
-def _term_node_type(term_type: str) -> str:
-    """Map a SPARQL term type onto a node type.
+def _term_iri(value: Any) -> str:
+    if not isinstance(value, str) or not re.fullmatch(
+        r'[A-Za-z][A-Za-z0-9+.-]*:[^\s<>"{}|^`\\\x00-\x1f]+', value
+    ):
+        raise ValueError(f"SPARQL term requires an absolute IRI: {value!r}")
+    try:
+        parsed = urlsplit(value)
+        if parsed.scheme in {"http", "https"}:
+            if not parsed.hostname:
+                raise ValueError("invalid HTTP authority")
+            _ = parsed.port
+    except ValueError as exc:
+        raise ValueError(f"invalid SPARQL term IRI: {value!r}") from exc
+    return value
 
-    URI and blank-node terms become ``"uri"`` nodes (blank-node ids are kept
-    verbatim); only literals become ``"literal"`` nodes.
-    """
-    return "literal" if term_type == "literal" else "uri"
 
-
-def _term_node(term: dict[str, Any]) -> NodeRecord:
+def _term_node(term: Any) -> NodeRecord:
     """Build a node record from one SPARQL term binding."""
-    value = str(term["value"])
-    term_type = str(term.get("type", "uri"))
+    if not isinstance(term, dict) or not isinstance(term.get("value"), str):
+        raise ValueError(f"invalid SPARQL term binding: {term!r}")
+    value = term["value"]
+    term_type = term.get("type")
+    if term_type not in ("uri", "bnode", "literal", "typed-literal"):
+        raise ValueError(f"unsupported SPARQL term type: {term_type!r}")
     attributes: dict[str, Any] = {}
-    if term_type == "literal":
+    if term_type in {"literal", "typed-literal"}:
         title = value
+        node_id = json.dumps(value, ensure_ascii=False)
         if "datatype" in term:
-            attributes["datatype"] = term["datatype"]
+            datatype = _term_iri(term["datatype"])
+            attributes["datatype"] = datatype
+            if datatype != "http://www.w3.org/2001/XMLSchema#string":
+                node_id += "^^<" + datatype + ">"
         if "xml:lang" in term:
-            attributes["xml:lang"] = term["xml:lang"]
+            language = term["xml:lang"]
+            if (
+                "datatype" in term
+                or not isinstance(language, str)
+                or not re.fullmatch(r"[A-Za-z]+(?:-[A-Za-z0-9]+)*", language)
+            ):
+                raise ValueError(f"invalid SPARQL language literal: {term!r}")
+            attributes["xml:lang"] = language.lower()
+            node_id += "@" + language.lower()
+        if term_type == "typed-literal" and "datatype" not in term:
+            raise ValueError("typed-literal requires a datatype IRI")
+        node_type = "literal"
+    elif term_type == "bnode":
+        if not value or any(character.isspace() for character in value):
+            raise ValueError(f"invalid SPARQL blank node label: {value!r}")
+        node_id, title, node_type = "_:" + value, value, "bnode"
     else:
-        title = _local_part(value)
+        node_id, title, node_type = _term_iri(value), _local_part(value), "uri"
+    if term_type not in {"literal", "typed-literal"} and ("datatype" in term or "xml:lang" in term):
+        raise ValueError(f"non-literal SPARQL term has literal metadata: {term!r}")
     return NodeRecord(
-        id=value,
+        id=node_id,
         title=title,
-        node_type=_term_node_type(term_type),
+        node_type=node_type,
         attributes=attributes,
     )
 
@@ -272,9 +330,12 @@ def bindings_to_graph(sparql_json: dict[str, Any], graph_name: str) -> GraphDocu
     binding value carries ``type`` (``uri`` | ``literal`` | ``bnode``) and
     ``value``. URI subjects and URI objects become nodes (``node_type
     "uri"``); literal objects become nodes with ``node_type "literal"``; the
-    predicate becomes the edge relation (local part of its IRI). Repeated
+    predicate's full IRI becomes the edge relation. Literal ids encode lexical
+    form, datatype and normalized language; blank node ids use ``_:`` and stay
+    scoped to this result document. Repeated
     subjects/objects across bindings are merged (first record wins) and exact
-    duplicate edges are collapsed, so valid results yield a valid document.
+    duplicate edges are collapsed. Document validation separately reports
+    structural profile issues such as self-links.
 
     Args:
         sparql_json: Parsed SPARQL JSON result document.
@@ -285,27 +346,38 @@ def bindings_to_graph(sparql_json: dict[str, Any], graph_name: str) -> GraphDocu
         (subject, predicate, object) triple, and provenance metadata.
 
     Raises:
-        ValueError: If fewer than three variables are selected.
+        ValueError: If the SELECT result structure or a bound RDF term is invalid.
     """
-    variables = list(sparql_json.get("head", {}).get("vars", []))
-    bindings = list(sparql_json.get("results", {}).get("bindings", []))
+    try:
+        variables = sparql_json["head"]["vars"]
+        bindings = sparql_json["results"]["bindings"]
+    except (KeyError, TypeError) as exc:
+        raise ValueError("SPARQL SELECT result requires head.vars and results.bindings") from exc
+    if not isinstance(variables, list) or not isinstance(bindings, list):
+        raise ValueError("SPARQL head.vars and results.bindings must be lists")
     subject_var, predicate_var, object_var = _resolve_sparql_roles(variables)
 
     nodes: dict[str, NodeRecord] = {}
     edges: dict[tuple[str, str, str], EdgeRecord] = {}
     skipped = 0
     for binding in bindings:
+        if not isinstance(binding, dict):
+            raise ValueError(f"SPARQL result row must be an object: {binding!r}")
         subject = binding.get(subject_var)
         predicate = binding.get(predicate_var)
         obj = binding.get(object_var)
-        if not (subject and predicate and obj):
+        if any(role not in binding for role in (subject_var, predicate_var, object_var)):
             skipped += 1
             continue
+        if not isinstance(subject, dict) or subject.get("type") not in ("uri", "bnode"):
+            raise ValueError(f"SPARQL triple subject must be an IRI or blank node: {subject!r}")
+        if not isinstance(predicate, dict) or predicate.get("type") != "uri":
+            raise ValueError(f"SPARQL triple predicate must be an IRI: {predicate!r}")
         source_node = _term_node(subject)
         target_node = _term_node(obj)
         nodes.setdefault(source_node.id, source_node)
         nodes.setdefault(target_node.id, target_node)
-        relation = _local_part(str(predicate["value"]))
+        relation = _term_iri(predicate.get("value"))
         edges.setdefault(
             (source_node.id, target_node.id, relation),
             EdgeRecord(

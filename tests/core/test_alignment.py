@@ -34,6 +34,18 @@ def test_complete_mapping_retains_evidence_and_accepts_yaml_date():
         "https://x/<a>",
         "file:///a",
         "https://user@x/a",
+        "https://example.org:bad/a",
+        "https://example.org:65536/a",
+        "https://example.org:0/a",
+        "https://example.org:/a",
+        "https://bad_host/a",
+        "https://example..org/a",
+        "https://%65xample.org/a",
+        "https://example.org/%nothex",
+        "https://[::1]bad/a",
+        "https://example.org../a",
+        "https://@example.org/a",
+        "https://999.999.999.999/a",
         None,
         4,
     ],
@@ -75,3 +87,16 @@ def test_duplicate_or_conflicting_targets_are_rejected():
     for relation in ("exactMatch", "broadMatch"):
         with pytest.raises(ValueError, match="conflicting"):
             reviewed_mappings([record(), dict(record(), relation=relation)])
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "https://[::1]:443/a",
+        "https://127.0.0.1:8080/a",
+        "https://例え.テスト/定義",
+        "https://example.org./a%20b",
+    ],
+)
+def test_valid_host_forms_retain_original_iri_bytes(value):
+    assert checked_iri(value) == value

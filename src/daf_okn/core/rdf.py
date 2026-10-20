@@ -41,7 +41,7 @@ from urllib.parse import quote
 from rdflib import BNode, Graph, Literal, Namespace, URIRef
 from rdflib.namespace import DCAT, DCTERMS, PROV, RDF, RDFS, SKOS, VOID, XSD
 
-from .alignment import reviewed_mappings
+from .alignment import RELATIONS, checked_iri, reviewed_mappings
 from .graph import EdgeRecord, GraphDocument, NodeRecord
 
 __all__ = [
@@ -54,6 +54,7 @@ __all__ = [
     "relation_predicate",
     "relation_slug",
     "shortname_slug",
+    "validate_rdf_semantics",
 ]
 
 KG_BASE = "https://purl.org/okn/frink/kg/"
@@ -182,7 +183,9 @@ def _is_external(node_id: str) -> bool:
     return bool(_ABSOLUTE_IRI.match(node_id))
 
 
-def _node_iri(namespace_base: str, node_id: str) -> URIRef:
+def _node_iri(namespace_base: str, node_id: str) -> URIRef | BNode:
+    if node_id.startswith("_:"):
+        return BNode(node_id[2:])
     if _is_external(node_id):
         return URIRef(node_id)
     return URIRef(f"{_ensure_base(namespace_base)}page/{_quote(node_id)}")
@@ -231,8 +234,7 @@ def _describe_node(
     title = node.title or node.id
     attributes = {key: value for key, value in node.attributes.items() if isinstance(key, str)}
 
-    if external:
-        # Someone else's IRI: label it, but do not assert page/concept membership for it.
+    if external or node.node_type == "bnode":
         graph.add((subject, RDFS.label, _lit(title, language)))
     else:
         graph.add((subject, RDF.type, SCHEMA.CreativeWork))
@@ -320,16 +322,19 @@ def _describe_node(
             used_terms.add(key_slug)
 
 
-def _edge_target(edge: EdgeRecord, base: str, literals: dict[str, NodeRecord]) -> URIRef | Literal:
+def _edge_target(
+    edge: EdgeRecord, base: str, literals: dict[str, NodeRecord], *, sparql_terms: bool = False
+) -> URIRef | BNode | Literal:
     literal_node = literals.get(edge.target)
     if literal_node is None:
         return _node_iri(base, edge.target)
     attrs = literal_node.attributes
+    value = literal_node.title if sparql_terms else literal_node.id
     if attrs.get("xml:lang"):
-        return Literal(literal_node.id, lang=str(attrs["xml:lang"]))
+        return Literal(value, lang=str(attrs["xml:lang"]), normalize=not sparql_terms)
     if attrs.get("datatype"):
-        return Literal(literal_node.id, datatype=URIRef(str(attrs["datatype"])))
-    return Literal(literal_node.id)
+        return Literal(value, datatype=URIRef(str(attrs["datatype"])), normalize=not sparql_terms)
+    return Literal(value)
 
 
 def _declare_vocabulary(
@@ -480,11 +485,146 @@ def build_rdf_graph(
             predicate = relation_predicate(edge.relation, base)
         if str(predicate).startswith(base + "relation/"):
             used_relations.add(str(predicate)[len(base + "relation/") :])
-        graph.add((_node_iri(base, edge.source), predicate, _edge_target(edge, base, literals)))
+        graph.add(
+            (
+                _node_iri(base, edge.source),
+                predicate,
+                _edge_target(
+                    edge, base, literals, sparql_terms=doc.metadata.get("source") == "sparql"
+                ),
+            )
+        )
 
     _declare_vocabulary(graph, base, used_relations, used_terms, language)
     _describe_dataset(graph, base, doc, entry, modified, domains, language)
+    errors = validate_rdf_semantics(graph, base)
+    if errors:
+        raise ValueError("; ".join(errors))
     return graph
+
+
+def validate_rdf_semantics(graph: Graph, namespace_base: str) -> list[str]:
+    """Check this export profile's mapping evidence and concept-valued keywords.
+
+    These are explicit local custody constraints, not global OWL reasoning or
+    independent confirmation that a reviewed correspondence is scientifically true.
+    """
+    base = _ensure_base(namespace_base)
+    errors: list[str] = []
+    iris = {term for triple in graph for term in triple if isinstance(term, URIRef)}
+    iris.update(
+        term.datatype
+        for _, _, term in graph
+        if isinstance(term, Literal) and term.datatype is not None
+    )
+    for iri in iris:
+        text = str(iri)
+        if re.search(r'[\s<>"{}|^`\\\x00-\x1f\x7f]', text) or not re.match(
+            r"[A-Za-z][A-Za-z0-9+.-]*:", text
+        ):
+            errors.append(f"invalid RDF IRI: {text!r}")
+        elif text.lower().startswith(("http:", "https:")):
+            try:
+                checked_iri(text)
+            except ValueError as error:
+                errors.append(str(error))
+    predicates = {URIRef(str(SKOS) + relation): relation for relation in RELATIONS}
+    assertions = {(s, p, o) for s, p, o in graph if p in predicates}
+    targets: dict[tuple[Any, Any], set[Any]] = {}
+    for subject, predicate, target in assertions:
+        targets.setdefault((subject, target), set()).add(predicate)
+        if (
+            not isinstance(subject, URIRef)
+            or not isinstance(target, URIRef)
+            or (subject, RDF.type, SKOS.Concept) not in graph
+            or subject == target
+            or (str(target).startswith(base) and (target, RDF.type, SKOS.Concept) not in graph)
+        ):
+            errors.append(
+                f"mapping endpoints must be distinct concepts and IRIs: {subject} {target}"
+            )
+        for endpoint in (subject, target):
+            try:
+                checked_iri(str(endpoint))
+            except ValueError as error:
+                errors.append(str(error))
+    for (subject, target), relations in targets.items():
+        if len(relations) != 1:
+            errors.append(f"conflicting mapping relations: {subject} {target}")
+    candidates = set(graph.subjects(RDF.predicate, None)) | {
+        s for s in graph.subjects() if str(s).startswith(base + "mapping/")
+    }
+    evidenced: set[tuple[Any, Any, Any]] = set()
+    for statement in candidates:
+        ps = list(graph.objects(statement, RDF.predicate))
+        if not str(statement).startswith(base + "mapping/") and not any(
+            p in predicates for p in ps
+        ):
+            continue
+        values = [
+            list(graph.objects(statement, p))
+            for p in (
+                RDF.subject,
+                RDF.predicate,
+                RDF.object,
+                DCTERMS.source,
+                DCTERMS.description,
+                DCTERMS.date,
+            )
+        ]
+        if (statement, RDF.type, RDF.Statement) not in graph or any(len(v) != 1 for v in values):
+            errors.append(
+                f"mapping statement requires complete single-valued evidence: {statement}"
+            )
+            continue
+        subject, predicate, target, source, rationale, reviewed = [v[0] for v in values]
+        assertion = subject, predicate, target
+        if not isinstance(predicate, URIRef) or assertion not in assertions:
+            errors.append(f"orphan mapping evidence: {statement}")
+            continue
+        if (
+            not isinstance(source, URIRef)
+            or not isinstance(rationale, Literal)
+            or not isinstance(reviewed, Literal)
+            or reviewed.datatype != XSD.date
+        ):
+            errors.append(f"invalid mapping evidence RDF terms: {statement}")
+            continue
+        try:
+            reviewed_mappings(
+                [
+                    dict(
+                        target=str(target),
+                        relation=predicates[predicate],
+                        evidence=str(source),
+                        rationale=str(rationale),
+                        reviewed_on=str(reviewed),
+                    )
+                ]
+            )
+        except ValueError as error:
+            errors.append(f"invalid mapping evidence: {statement}: {error}")
+        else:
+            evidenced.add(assertion)
+    for subject, predicate, target in assertions - evidenced:
+        errors.append(f"mapping lacks complete review evidence: {subject} {predicate} {target}")
+    for subject, keyword in graph.subject_objects(SCHEMA.keywords):
+        if not isinstance(keyword, URIRef):
+            errors.append(f"keyword must be a concept IRI: {subject}")
+        elif str(keyword).startswith(base) and (
+            (keyword, RDF.type, SKOS.Concept) not in graph
+            or not any(
+                isinstance(label, Literal) and str(label).strip()
+                for label in graph.objects(keyword, SKOS.prefLabel)
+            )
+        ):
+            errors.append(f"local keyword lacks concept declaration or label: {keyword}")
+        else:
+            try:
+                checked_iri(str(keyword))
+            except ValueError as error:
+                errors.append(str(error))
+    return sorted(set(errors))
 
 
 # --------------------------------------------------------------------------- writing

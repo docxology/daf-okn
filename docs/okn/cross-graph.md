@@ -14,6 +14,7 @@ named graph, requests their labels from Ubergraph, and executes the three-graph
 join locally. Requests are sequential, bounded by subject batches and a response
 size limit. Failures retain the query and any received response; they exit 1.
 An empty final join also exits 1. Existing capture directories are preserved.
+Replay outputs must also use a new directory.
 
 ```bash
 daf-okn join --source cognitive/output/okn/cognitive-kb.nq \
@@ -21,7 +22,7 @@ daf-okn join --source cognitive/output/okn/cognitive-kb.nq \
   --output output/cognitive-live-capture
 daf-okn join --source cognitive/output/okn/cognitive-kb.nq \
   --query cognitive/docs/okn/queries/cross_graph_obo.rq \
-  --replay cognitive/docs/okn/evidence/2026-10-20 \
+  --replay cognitive/docs/okn/evidence/2026-10-20-graph-methods \
   --output output/cognitive-replay
 ```
 
@@ -34,10 +35,20 @@ variables of cognitive's OBO query; it is not an arbitrary SPARQL runner.
 
 A capture contains the exact queries, raw SPARQL JSON responses, SHA-256 hashes,
 observation time, local-export hash and join-query hash in `manifest.json`.
+New captures use schema version 2 and also hash the stored `join-query.rq` and
+both result files. Result JSON records structured provenance for its source,
+query, endpoint, observation time and individual remote captures.
 `join-results.json` contains all joined rows; `join-results.md` provides linked
 source pages, Wikidata keys and ontology labels. Replay verifies hashes, bounded
 query structure, requested subjects and predicates before adding triples.
 Changing the export or query requires a new capture, preserving the old one.
+Replay derives the entire ordered batch inventory from the local keys and first
+stage responses, including batches that returned no triples. It rejects omitted,
+duplicated or unexpected batches, changed counts, unrecorded files, symlinks,
+malformed JSON and unsupported schema versions. Version 2 also compares the
+recomputed results with the captured results. Original manifests without a
+schema version remain readable under their original response/query hash
+contract; their optional result summaries are recomputed rather than trusted.
 
 The first mapping may be reviewed `skos:exactMatch` or `skos:closeMatch`. Capture
 uses only well-formed Wikidata entity IRIs and excludes `rdfs:seeAlso` discovery
@@ -54,7 +65,7 @@ daf-okn bundle-rdf --root cognitive --output output/cognitive-submission
 daf-okn bundle-rdf --output output/cognitive-submission --check
 ```
 
-The builder checks export hashes, available source hashes, matching Turtle/N-Quads,
+The builder checks export hashes, complete current source hashes, matching Turtle/N-Quads,
 named-graph scope, and dataset/scheme/page licensing. It accepts CC BY 4.0 or CC0
 1.0 and refuses incompatible licensing. It copies canonical artifacts, graph
 documentation and attribution, extracts the registry entry, and adds registry
@@ -66,6 +77,19 @@ keywords, undeclared local keyword concepts, custom citation predicates and
 SKOS mappings without complete source/rationale/date evidence.
 The check rejects changed, missing, extra or escaping files. An existing output
 directory is not overwritten. Partial failed bundles remain available for diagnosis.
+The required payload is defined by `BUNDLE_FILES` in
+`src/daf_okn/core/rdf_submission.py`; removing a required file from the manifest
+does not make it optional. Verification rechecks RDF semantics and license
+agreement even when all recorded hashes have been updated. Source inventories
+cover root Markdown, Markdown under KB/docs/code, existing environment config
+files and the exporter's local Python import closure, including its package
+initializer and transitive imported helpers. The exact `resolution_files` list
+also binds all regular root filenames and filenames under KB/docs/code, including
+extensionless names that can shadow Markdown targets. Markdown suffix matching
+is case-insensitive.
+New or missing pages require a fresh export. Offline bundle checks validate the
+recorded source inventory's structure; current source bytes and completeness
+require `validate_export(directory, root)` or a fresh `bundle-rdf --root` run.
 
 Only the canonical N-Quads object is intended for lakeFS upload. The manifest,
 documentation and captured remote responses are review evidence, not additional
@@ -97,3 +121,6 @@ rewritten because SIO requires an information entity conforming to a specificati
 Historical capture manifests remain bound to their original source/query bytes.
 After changing mappings or serializers, create a fresh capture; never rewrite old
 hashes to make historical responses appear current.
+
+See [custody and replay contracts](custody-and-replay.md) for file safety,
+schema compatibility and the limits of hash-based provenance.

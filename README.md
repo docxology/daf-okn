@@ -115,6 +115,10 @@ documents mapping validation, direct STATO/NCI keyword reuse and the boundary
 between discovery links and reviewed correspondences. The Markdown adapter
 preserves these records, including nested review dates, before RDF serialization.
 
+[RDF identity and structural measurement](docs/okn/graph-methods.md) documents
+SPARQL term preservation, the lossless multigraph projection, and the distinction
+between statement counts and the connectivity used for density and centrality.
+
 ### Relationship to the `cognitive` repository's exporter
 
 The `cognitive` repository has its own reference exporter,

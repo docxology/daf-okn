@@ -95,6 +95,33 @@ class TestComputeMetrics:
         metrics = compute_metrics(_metrics_document(), top_k=2)
         assert len(metrics["top_central_nodes"]) == 2
 
+    @pytest.mark.parametrize("top_k", [-1, 1.5, True])
+    def test_invalid_ranking_limit_is_rejected(self, top_k) -> None:
+        """Invalid limits must not silently slice or truncate the ranking."""
+        with pytest.raises(ValueError, match="top_k"):
+            compute_metrics(_metrics_document(), top_k=top_k)
+
+    def test_statement_and_projection_counts_are_distinct(self) -> None:
+        """Parallel predicates and duplicate provenance do not inflate density."""
+        doc = GraphDocument(
+            "parallel",
+            [NodeRecord("a", "A"), NodeRecord("b", "B")],
+            [
+                EdgeRecord("a", "b", "p"),
+                EdgeRecord("a", "b", "q"),
+                EdgeRecord("a", "b", "p", "inferred"),
+            ],
+        )
+        metrics = compute_metrics(doc, centralities=False, top_k=0)
+        assert metrics["edge_count"] == 1
+        assert metrics["edge_record_count"] == 3
+        assert metrics["statement_count"] == 2
+        assert metrics["parallel_statement_count"] == 1
+        assert metrics["duplicate_statement_count"] == 1
+        assert metrics["relation_counts"] == {"p": 2, "q": 1}
+        assert metrics["density"] == pytest.approx(0.5)
+        assert metrics["top_central_nodes"] == []
+
     def test_empty_document(self) -> None:
         metrics = compute_metrics(GraphDocument(name="empty"))
         assert metrics["node_count"] == 0

@@ -57,14 +57,19 @@ output directory for each capture or bundle, preserving failures and earlier evi
 | `output/web/dashboard.html` | `scripts/build_dashboard.py` (via `dashboard/`) | human review |
 | `output/docs/api_reference.md` | `scripts/generate_api_docs.py` (via `core/documentation.py`) | agent reference |
 
+`graph_report.json` distinguishes source records and distinct statements from
+the simple projection used for connectivity and density. See
+[RDF identity and structural measurement](okn/graph-methods.md) for the counting
+contract and the lossless multigraph interface.
+
 ## Regeneration Sequence
 
 If any artifact becomes corrupted or you change the analysis, follow this sequence:
 
-1. **Clean (optional)**: Delete the entire `output/` directory to start fresh.
-   ```bash
-   rm -rf output/
-   ```
+1. **Preserve evidence**: Use a fresh output destination for a new capture or
+   submission bundle. Retain source-bound captures, validation receipts, failed
+   runs and historical bundles until their replacements are verified. Regenerate
+   routine derived artifacts through their producer rather than editing them.
 
 2. **Run the research workflow** — registry snapshot, cognitive export, graph analysis, figures.
    ```bash

@@ -97,6 +97,18 @@ class TestValidateGraph:
 class TestGraphStats:
     """Exact summary numbers on small known documents."""
 
+    def test_density_uses_connectivity_instead_of_parallel_statement_count(self) -> None:
+        """Five predicates on one pair occupy one of two possible arcs."""
+        doc = _document(
+            NodeRecord("a", "A"),
+            NodeRecord("b", "B"),
+            edges=tuple(EdgeRecord("a", "b", str(i)) for i in range(5)),
+        )
+        stats = graph_stats(doc)
+        assert stats["edge_count"] == 5
+        assert stats["projected_edge_count"] == 1
+        assert stats["density"] == pytest.approx(0.5)
+
     def test_stats_on_path_graph(self) -> None:
         stats = graph_stats(_clean_document())
         assert stats["node_count"] == 3
@@ -136,6 +148,13 @@ class TestGraphStats:
         assert stats == {
             "node_count": 1,
             "edge_count": 0,
+            "projected_node_count": 1,
+            "projected_edge_count": 0,
+            "statement_count": 0,
+            "duplicate_statement_count": 0,
+            "parallel_statement_count": 0,
+            "relation_counts": {},
+            "node_type_counts": {"concept": 1},
             "density": 0.0,
             "directed": True,
             "component_count": 1,

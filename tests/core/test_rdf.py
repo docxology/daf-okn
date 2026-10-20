@@ -10,7 +10,7 @@ from rdflib import Literal, URIRef
 from rdflib.namespace import DCTERMS, RDF, RDFS, SKOS, XSD
 
 from daf_okn.core.cognitive_adapter import build_cognitive_graph
-from daf_okn.core.graph import EdgeRecord, GraphDocument, NodeRecord
+from daf_okn.core.graph import EdgeRecord, GraphDocument, NodeRecord, bindings_to_graph
 from daf_okn.core.rdf import (
     SUPPORTED_FORMATS,
     build_rdf_graph,
@@ -426,6 +426,78 @@ def test_unsupported_format_is_rejected_before_writing(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="Unsupported RDF format"):
         graph_to_rdf(_doc(), tmp_path / "g.xyz", fmt="xyz")
     assert not (tmp_path / "g.xyz").exists()
+
+
+@pytest.mark.parametrize(
+    "fault", ["mapping_without_review", "external_mapping", "bad_iri", "bad_namespace"]
+)
+def test_generic_export_rejects_inconsistent_rdf_before_writes(tmp_path, fault):
+    doc = GraphDocument(
+        name="demo", nodes=[NodeRecord("page", "Page"), NodeRecord("target", "Target")]
+    )
+    base = BASE
+    if fault == "mapping_without_review":
+        doc.edges.append(EdgeRecord("page", "target", str(SKOS.exactMatch)))
+    elif fault == "external_mapping":
+        doc.nodes[0] = NodeRecord(
+            "https://example.org/external",
+            "External",
+            node_type="uri",
+            attributes={
+                "external_mappings": [
+                    {
+                        "target": "https://example.org/target",
+                        "relation": "closeMatch",
+                        "evidence": "https://example.org/evidence",
+                        "rationale": "Compared definitions.",
+                        "reviewed_on": "2026-10-20",
+                    }
+                ]
+            },
+        )
+    elif fault == "bad_iri":
+        doc.nodes[0] = NodeRecord("https://example.org:bad/page", "Bad IRI", node_type="uri")
+    else:
+        base = "https://example.org:65536/"
+    path = tmp_path / "rejected.nq"
+    with pytest.raises(ValueError):
+        graph_to_rdf(doc, path, namespace_base=base)
+    assert not path.exists()
+
+
+def test_sparql_graph_export_retains_literal_values_blank_nodes_and_predicate_iris(tmp_path):
+    predicate = "https://example.org/predicate"
+    payload = {
+        "head": {"vars": ["s", "p", "o"]},
+        "results": {
+            "bindings": [
+                {
+                    "s": {"type": "bnode", "value": "subject"},
+                    "p": {"type": "uri", "value": predicate},
+                    "o": {"type": "literal", "value": "01", "datatype": str(XSD.integer)},
+                },
+                {
+                    "s": {"type": "uri", "value": "https://example.org/subject"},
+                    "p": {"type": "uri", "value": predicate},
+                    "o": {"type": "literal", "value": 'quoted "label"', "xml:lang": "en"},
+                },
+            ]
+        },
+    }
+    doc = bindings_to_graph(payload, "sparql")
+    graph = build_rdf_graph(doc)
+    assert (
+        rdflib.BNode("subject"),
+        URIRef(predicate),
+        Literal("01", datatype=XSD.integer, normalize=False),
+    ) in graph
+    assert (
+        URIRef("https://example.org/subject"),
+        URIRef(predicate),
+        Literal('quoted "label"', lang="en"),
+    ) in graph
+    path = graph_to_rdf(doc, tmp_path / "sparql.nq")
+    assert '"01"^^<' in path.read_text()
 
 
 def test_cognitive_fixture_vault_exports_expected_shapes(tmp_path: Path) -> None:
