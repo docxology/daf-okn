@@ -62,6 +62,7 @@ See [canonical RDF and cross-graph workflows](docs/okn/cross-graph.md).
 | `daf-okn pull query --shortname NAME --sparql QUERY [--out FILE]` | Run a SPARQL query against one graph's endpoint and save the JSON result. |
 | `daf-okn export --repo DIR [--out FILE] [--name NAME] [--keep-redirects] [--no-wikilinks]` | Read a vault (or a `cognitive` checkout, using its `knowledge_base/`) into graph JSON. |
 | `daf-okn analyze --graph FILE [--out-dir DIR]` | Write `graph_report.json` with structural metrics; exits 1 if the graph breaks an invariant (dangling edge, duplicate id, ...). |
+| `daf-okn status --graph FILE [--report FILE]` | Read-only JSON observation of graph invariants and optional report consistency; exits 1 for missing, malformed or inconsistent evidence. |
 | `daf-okn visualize --graph FILE [--figure PNG] [--dashboard HTML] [--metrics JSON] [--layout NAME]` | Render the network figure and the HTML dashboard (`--no-figure` / `--no-dashboard` skip one). |
 | `daf-okn package --graph FILE --out-dir DIR [--fmt nq] [--preset NAME] [--entry-*] [--contact ...]` | Write the contribution package; exits 1 and lists problems if the entry is incomplete. |
 
@@ -71,6 +72,8 @@ Run `daf-okn <command> --help` for every option. `pull` and live `join` use the 
 
 The scripts in `scripts/` are thin wrappers over the same code (`scripts/10_research_workflow.py`
 chains pull, export, analyze and visualize for the research manuscript).
+
+Stack consumers should start with [local status and Sidecar evidence](docs/stack-integration.md).
 
 ## Contributing a graph to the OKN registry
 

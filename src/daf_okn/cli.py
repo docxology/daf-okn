@@ -42,6 +42,14 @@ __all__ = ["build_parser", "main"]
 COGNITIVE_REPO_ENV = "DAF_OKN_COGNITIVE_REPO"
 
 
+def _cmd_status(args: argparse.Namespace) -> int:
+    from .analysis.artifact_status import inspect_artifacts
+
+    observation = inspect_artifacts(args.graph, args.report)
+    print(json.dumps(observation, indent=2, sort_keys=True))
+    return 0 if observation["status"] == "pass" else 1
+
+
 def _cmd_join(args: argparse.Namespace) -> int:
     cross_graph.run(
         cross_graph.JoinOptions(args.source, args.query, args.output, args.endpoint, args.replay)
@@ -298,6 +306,12 @@ def build_parser() -> argparse.ArgumentParser:
     bundle.add_argument("--output", required=True, type=Path)
     bundle.add_argument("--check", action="store_true")
     bundle.set_defaults(func=_cmd_bundle_rdf)
+    status = commands.add_parser(
+        "status", help="inspect existing graph/report evidence offline (JSON)"
+    )
+    status.add_argument("--graph", required=True, type=Path, help="existing graph JSON")
+    status.add_argument("--report", type=Path, help="existing graph_report.json to remeasure")
+    status.set_defaults(func=_cmd_status)
     return parser
 
 

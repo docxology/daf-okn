@@ -10,6 +10,7 @@ Layout:
 
 from __future__ import annotations
 
+from .artifact_status import inspect_artifacts
 from .graph_metrics import (
     centrality_scores,
     compute_metrics,
@@ -27,6 +28,7 @@ __all__ = [
     "degree_sequence",
     "edge_centrality_scores",
     "in_out_degrees",
+    "inspect_artifacts",
     "run_analysis",
     "triangle_count",
 ]

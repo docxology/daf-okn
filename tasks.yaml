@@ -7,3 +7,15 @@ tasks:
     status: done
     validationCommand: bash scripts/gate.sh
     notes: "Offline graph, registry, and script tests pass. Generator smoke tests write into temporary project roots; no live OKN requests or manuscript regeneration are part of this gate."
+  - id: daf-okn-artifact-status
+    title: Inspect local graph and report evidence without regeneration
+    status: done
+    priority: high
+    validationCommand: bash scripts/gate.sh
+    notes: "Implemented src/daf_okn/analysis/artifact_status.py, CLI status adapter, direct real-file negative controls and docs/stack-integration.md. Whole native gate passed offline with UV_PYTHON=3.12 and localhost fixture access; Ruff and mypy passed. Default Python 3.14 remains blocked by an uncached coverage wheel. Sidecar doctor reports valid metadata with dirty-checkout concerns, not gate proof. Existing review worktrees remain reserved."
+  - id: daf-okn-stack-status-consumer
+    title: Admit artifact status into stack and operator evidence views
+    status: todo
+    priority: medium
+    deps: [daf-okn-artifact-status]
+    notes: "Coordinate with daf-stack and daf-operator owners. Consume daf_okn.cli:main status JSON via the existing admitted console bridge; install runtime before calls, preserve unassessed fields, independently bind source/board/gate evidence. Negative control: missing report or changed input must not retain a passing artifact observation. Sidecar coverage is separate. See docs/stack-integration.md."

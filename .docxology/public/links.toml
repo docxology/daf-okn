@@ -1,0 +1,13 @@
+# Cross-repo / Hum Lab project links for daf-okn.
+# Free-form and unparsed by the tool — a human-readable record of this
+# repo's relationships to other docxology or Hum Lab projects. (The
+# machine-readable Hum Lab link lives in manifest.toml's
+# `hum_lab_project` field.)
+#
+# Example shape (uncomment and edit):
+# related = ["docxology/other-repo"]
+related = ["docxology/daf-stack", "docxology/daf-sidecar", "docxology/daf-operator", "docxology/daf-dot"]
+local_contract = "docs/stack-integration.md"
+local_board = "tasks.yaml"
+native_gate = "bash scripts/gate.sh"
+# daf-dot owns real-time voice protocol; daf-operator owns spatialized information.
