@@ -37,7 +37,7 @@ from collections.abc import Iterable
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
-from urllib.parse import quote
+from urllib.parse import quote, unquote
 
 from rdflib import BNode, Graph, Literal, Namespace, URIRef
 from rdflib.namespace import DCAT, DCTERMS, PROV, RDF, RDFS, SKOS, VOID, XSD
@@ -566,8 +566,9 @@ def validate_entity_model(graph: Graph, namespace_base: str) -> list[str]:
     """Check explicit document/topic roles and local predicate endpoint scopes.
 
     External mapping and keyword targets need not be redeclared locally. Local
-    pages and topics must be typed, and a topic's sources are documents linked
-    with both about and subject. This is a bounded RDF profile, not OWL reasoning.
+    pages and topics must be typed. Each local topic has exactly its same-path
+    document owner, linked with both about and subject; document-only source
+    roles cannot acquire topics. This is a bounded RDF profile, not OWL reasoning.
     """
     base = _ensure_base(namespace_base)
     errors: list[str] = []
@@ -598,7 +599,16 @@ def validate_entity_model(graph: Graph, namespace_base: str) -> list[str]:
             errors.append(f"topic requires Concept type and prefLabel: {topic}")
         about = set(graph.subjects(SCHEMA.about, topic))
         subject_documents = set(graph.subjects(DCTERMS.subject, topic))
-        if not about or about != subject_documents or not about <= documents:
+        owner = URIRef(base + "page/" + str(topic)[len(base + "concept/") :])
+        if (
+            owner not in documents
+            or about != {owner}
+            or subject_documents != {owner}
+            or any(
+                set(graph.objects(owner, predicate)) != {topic}
+                for predicate in (SCHEMA.about, DCTERMS.subject)
+            )
+        ):
             errors.append(f"topic requires matching document about/subject links: {topic}")
     for topic_predicate in (SCHEMA.about, DCTERMS.subject):
         for document, candidate_topic in graph.subject_objects(topic_predicate):
@@ -612,18 +622,28 @@ def validate_entity_model(graph: Graph, namespace_base: str) -> list[str]:
                     "about/subject endpoints require a document and concept: "
                     f"{document} {candidate_topic}"
                 )
-        for page in pages:
-            about = set(graph.objects(page, SCHEMA.about))
-            subject_topics = set(graph.objects(page, DCTERMS.subject))
-            page_types = {str(t) for t in graph.objects(page, URIRef(base + "vocab/pageType"))}
-            parts = str(page)[len(base + "page/") :].split("/")
-            if about != subject_topics or (
-                page_types & TOPIC_TYPES
-                and not about
-                and "citations" not in parts[:-1]
-                and parts[-1].lower() not in {"readme", "agents", "catalog", "index"}
-            ):
-                errors.append(f"page requires matching about/subject links for its topic: {page}")
+    for page in pages:
+        about = set(graph.objects(page, SCHEMA.about))
+        subject_topics = set(graph.objects(page, DCTERMS.subject))
+        page_types = {str(t) for t in graph.objects(page, URIRef(base + "vocab/pageType"))}
+        suffix = str(page)[len(base + "page/") :]
+        # WHY: decode only to inspect source-path roles. Ownership compares exact
+        # RDF terms, so percent-encoded aliases never become interchangeable IRIs.
+        parts = unquote(suffix).split("/")
+        document_only = (
+            bool(page_types - TOPIC_TYPES)
+            or "citations" in parts[:-1]
+            or parts[-1].lower() in {"readme", "agents", "catalog", "index"}
+            or (page, RDF.type, SCHEMA.CollectionPage) in graph
+        )
+        if document_only and (about or subject_topics):
+            errors.append(f"document-only page cannot have topic about/subject links: {page}")
+        if about != subject_topics or (
+            not document_only
+            and page_types & TOPIC_TYPES
+            and about != {URIRef(base + "concept/" + suffix)}
+        ):
+            errors.append(f"page requires matching about/subject links for its topic: {page}")
     document_predicates = {
         DCTERMS.title,
         DCTERMS.description,

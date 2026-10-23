@@ -139,6 +139,73 @@ def add_topic(graph):
     return topic
 
 
+@pytest.mark.parametrize("fault", ["swap", "citation", "navigation", "guide"])
+def test_rehashed_export_and_bundle_reject_wrong_topic_ownership_and_roles(tmp_path, fault):
+    """Current sources and refreshed hashes cannot bless semantically forged pairs."""
+    root = source_repo(tmp_path)
+    export = root / "output/okn"
+    dataset = Dataset().parse(export / "cognitive-kb.nq", format="nquads")
+    graph = dataset.graph(URIRef(GRAPH))
+    first = add_topic(graph)
+    second_path = {
+        "swap": "other",
+        "citation": "citations/smith_2022",
+        "navigation": "biology/AGENTS",
+        "guide": "biology/manual",
+    }[fault]
+    page, topic = (URIRef(GRAPH + role + second_path) for role in ("/page/", "/concept/"))
+    graph.add((page, RDF.type, SCHEMA.CreativeWork))
+    graph.add((page, DCTERMS.source, URIRef("https://example.org/" + second_path)))
+    if fault == "navigation":
+        graph.add((page, RDF.type, SCHEMA.CollectionPage))
+    if fault in {"citation", "guide"}:
+        graph.add((page, URIRef(GRAPH + "/vocab/pageType"), Literal(fault)))
+    if fault == "swap":
+        graph.add((topic, RDF.type, SKOS.Concept))
+        graph.add((topic, SKOS.prefLabel, Literal("Other")))
+        for predicate in (SCHEMA.about, DCTERMS.subject):
+            graph.add((page, predicate, topic))
+    dataset.serialize(export / "cognitive-kb.nq", format="nquads")
+    graph.serialize(export / "cognitive-kb.ttl", format="turtle")
+    refresh_manifest(export)
+    assert submission.validate_export(export, root) == []
+    bundle = tmp_path / "bundle"
+    submission.prepare(root, bundle)
+    assert submission.verify(bundle) == []
+
+    if fault == "swap":
+        owner = URIRef(GRAPH + "/page/example")
+        for predicate in (SCHEMA.about, DCTERMS.subject):
+            graph.remove((owner, predicate, first))
+            graph.remove((page, predicate, topic))
+            graph.add((owner, predicate, topic))
+            graph.add((page, predicate, first))
+    else:
+        for triple in (
+            (topic, RDF.type, SKOS.Concept),
+            (topic, SKOS.prefLabel, Literal("Forged topic")),
+            (topic, SKOS.inScheme, URIRef(GRAPH + "/scheme")),
+            (page, SCHEMA.about, topic),
+            (page, DCTERMS.subject, topic),
+        ):
+            graph.add(triple)
+    dataset.serialize(export / "cognitive-kb.nq", format="nquads")
+    graph.serialize(export / "cognitive-kb.ttl", format="turtle")
+    refresh_manifest(export)
+    errors = submission.validate_export(export, root)
+    expected = "matching document about/subject" if fault == "swap" else "document-only page"
+    assert any(expected in e for e in errors), errors
+    assert not any("hash mismatch" in e or "inventory" in e for e in errors), errors
+    for name in ("cognitive-kb.nq", "cognitive-kb.ttl", "manifest.json"):
+        (bundle / name).write_bytes((export / name).read_bytes())
+    receipt = json.loads((bundle / "bundle.json").read_text())
+    receipt["files"] = {name: submission.sha256(bundle / name) for name in receipt["files"]}
+    (bundle / "bundle.json").write_text(json.dumps(receipt))
+    errors = submission.verify(bundle)
+    assert any(expected in e for e in errors), errors
+    assert not any("hash mismatch" in e or "inventory" in e for e in errors), errors
+
+
 def test_bundle_preserves_canonical_graph_and_verifies_actual_files(tmp_path):
     root = source_repo(tmp_path)
     out = tmp_path / "bundle"

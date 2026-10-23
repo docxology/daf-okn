@@ -8,6 +8,7 @@ from urllib.parse import parse_qs, urlparse
 
 import pytest
 from rdflib import Dataset, Literal, URIRef
+from rdflib.namespace import DCTERMS, RDF, SKOS
 
 from daf_okn.analysis import cross_graph as join
 from daf_okn.cli import main as run_cli
@@ -462,6 +463,69 @@ def test_new_model_cannot_be_downgraded_to_historical_capture_schema(tmp_path):
             (tmp_path / "out", "2026-10-23"),
             schema_version=2,
         )
+
+
+@pytest.mark.parametrize("fault", ["swap", "citation", "navigation", "guide"])
+def test_schema3_admission_and_results_reject_forged_document_topic_pairs(tmp_path, fault):
+    """Both admission paths reject paired forgeries before attributing a source."""
+    source = local_export(tmp_path)
+    dataset = Dataset().parse(source, format="nquads")
+    graph = dataset.graph(URIRef(join.GRAPH))
+    path = {
+        "swap": "biology/symbiosis",
+        "citation": "citations/smith_2022",
+        "navigation": "biology/AGENTS",
+        "guide": "biology/manual",
+    }[fault]
+    page, topic = (URIRef(join.GRAPH + role + path) for role in ("/page/", "/concept/"))
+    graph.add((page, RDF.type, join.SCHEMA.CreativeWork))
+    graph.add((page, DCTERMS.source, URIRef("https://example.org/" + path)))
+    if fault == "navigation":
+        graph.add((page, RDF.type, join.SCHEMA.CollectionPage))
+    if fault in {"citation", "guide"}:
+        graph.add((page, URIRef(join.GRAPH + "/vocab/pageType"), Literal(fault)))
+    if fault == "swap":
+        graph.add((topic, RDF.type, SKOS.Concept))
+        graph.add((topic, SKOS.prefLabel, Literal("Symbiosis")))
+        for predicate in (join.SCHEMA.about, DCTERMS.subject):
+            graph.add((page, predicate, topic))
+    dataset.serialize(source, format="nquads")
+    join.local_dataset(source)
+    dataset.graph(URIRef(join.MAPPINGS)).add((URIRef(WD), URIRef(join.EXACT), URIRef(TERM)))
+    dataset.graph(URIRef(join.UBERGRAPH)).add(
+        (URIRef(TERM), URIRef(join.LABEL), Literal("cortisol"))
+    )
+    accepted = tmp_path / "accepted"
+    join.write_results(dataset, QUERY, (accepted, "2026-10-23"))
+    rows = json.loads((accepted / "join-results.json").read_text())["rows"]
+    assert rows[0]["page"] == PAGE
+    assert rows[0]["source"] == "https://example.org/cortisol"
+    if fault == "swap":
+        for predicate in (join.SCHEMA.about, DCTERMS.subject):
+            graph.remove((URIRef(PAGE), predicate, URIRef(CONCEPT)))
+            graph.remove((page, predicate, topic))
+            graph.add((URIRef(PAGE), predicate, topic))
+            graph.add((page, predicate, URIRef(CONCEPT)))
+    else:
+        for triple in (
+            (topic, RDF.type, SKOS.Concept),
+            (topic, SKOS.prefLabel, Literal("Forged topic")),
+            (topic, SKOS.inScheme, URIRef(join.GRAPH + "/scheme")),
+            (page, join.SCHEMA.about, topic),
+            (page, DCTERMS.subject, topic),
+        ):
+            graph.add(triple)
+    # Keep the same graph for direct write_results; serialize local data separately.
+    local = Dataset()
+    local_graph = local.graph(URIRef(join.GRAPH))
+    local_graph += graph
+    local.serialize(source, format="nquads")
+    with pytest.raises(join.JoinError, match="document|topic"):
+        join.local_dataset(source)
+    rejected = tmp_path / "rejected"
+    with pytest.raises(join.JoinError, match="document|topic"):
+        join.write_results(dataset, QUERY, (rejected, "2026-10-23"))
+    assert not rejected.exists()
 
 
 @pytest.mark.parametrize("fault", ["page", "source"])

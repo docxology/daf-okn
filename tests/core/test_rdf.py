@@ -5,13 +5,14 @@ from __future__ import annotations
 import subprocess
 import sys
 from pathlib import Path
+from urllib.parse import quote
 
 import pytest
 import rdflib
 from rdflib import Literal, URIRef
 from rdflib.namespace import DCTERMS, RDF, RDFS, SKOS, XSD
 
-from daf_okn.core.cognitive_adapter import build_cognitive_graph
+from daf_okn.core.cognitive_adapter import DOCUMENT_TYPES, build_cognitive_graph
 from daf_okn.core.graph import EdgeRecord, GraphDocument, NodeRecord, bindings_to_graph
 from daf_okn.core.rdf import (
     SUPPORTED_FORMATS,
@@ -777,6 +778,128 @@ def test_distinct_documents_topics_citations_and_navigation_are_accepted(tmp_pat
     assert not list(graph.triples((_concept("topic"), DCTERMS.source, None)))
     for name, body in pages.items():
         assert (tmp_path / name).read_bytes() == body.encode()
+
+
+@pytest.mark.parametrize("base", [BASE, "https://example.org/local/"])
+@pytest.mark.parametrize("fault", ["swap", "extra_owner", "extra_topic", "encoded_alias"])
+def test_local_topics_require_exactly_their_same_path_document(base, fault):
+    """Paired predicates alone cannot establish ownership of another page's topic."""
+    graph = build_rdf_graph(
+        GraphDocument("demo", nodes=[NodeRecord("a", "A"), NodeRecord("b", "B")]),
+        namespace_base=base,
+    )
+    assert validate_rdf_semantics(graph, base) == []
+    pages = [URIRef(base + "page/" + name) for name in ("a", "b")]
+    topics = [URIRef(base + "concept/" + name) for name in ("a", "b")]
+    if fault == "encoded_alias":
+        alias = URIRef(base + "concept/%61")
+        original = graph
+        graph = rdflib.Graph()
+        for triple in original:
+            graph.add(tuple(alias if term == topics[0] else term for term in triple))
+    else:
+        for predicate in (SCHEMA.about, DCTERMS.subject):
+            if fault == "swap":
+                for i in range(2):
+                    graph.remove((pages[i], predicate, topics[i]))
+                    graph.add((pages[i], predicate, topics[1 - i]))
+            elif fault == "extra_topic":
+                graph.add((pages[0], predicate, topics[1]))
+            else:
+                other = URIRef("https://example.org/another-document")
+                graph.add((other, RDF.type, SCHEMA.CreativeWork))
+                graph.add((other, predicate, topics[0]))
+    assert any("matching document about/subject" in e for e in validate_rdf_semantics(graph, base))
+
+
+@pytest.mark.parametrize("kind", sorted(DOCUMENT_TYPES) + ["unknown_editorial_kind"])
+def test_document_only_source_types_cannot_acquire_forged_paired_topics(kind):
+    """A complete concept declaration and paired links do not change the source role."""
+    graph = build_rdf_graph(
+        GraphDocument("demo", nodes=[NodeRecord("records/item", "Item", node_type=kind)]),
+        namespace_base=BASE,
+    )
+    assert validate_rdf_semantics(graph, BASE) == []
+    page, topic = _page("records/item"), _concept("records/item")
+    for triple in (
+        (page, SCHEMA.about, topic),
+        (page, DCTERMS.subject, topic),
+        (topic, RDF.type, SKOS.Concept),
+        (topic, SKOS.prefLabel, Literal("Forged topic")),
+        (topic, SKOS.inScheme, URIRef(BASE + "scheme")),
+    ):
+        graph.add(triple)
+    assert any("document-only page" in e for e in validate_rdf_semantics(graph, BASE))
+
+
+@pytest.mark.parametrize(
+    "path,collection",
+    [
+        ("citations/smith_2022", False),
+        ("biology/citations/paper", False),
+        ("%63itations/paper", False),
+        ("biology/AGENTS", False),
+        ("biology/%41GENTS", False),
+        ("biology/ReadMe", False),
+        ("biology/catalog", False),
+        ("biology/index", False),
+        ("biology/navigation", True),
+    ],
+)
+def test_document_only_paths_and_collection_pages_override_topic_type(path, collection):
+    graph = rdflib.Graph()
+    page, topic = _page(path), _concept(path)
+    graph.add((page, RDF.type, SCHEMA.CreativeWork))
+    graph.add((page, URIRef(BASE + "vocab/pageType"), Literal("concept")))
+    if collection:
+        graph.add((page, RDF.type, SCHEMA.CollectionPage))
+    assert validate_rdf_semantics(graph, BASE) == []
+    for triple in (
+        (page, SCHEMA.about, topic),
+        (page, DCTERMS.subject, topic),
+        (topic, RDF.type, SKOS.Concept),
+        (topic, SKOS.prefLabel, Literal("Forged topic")),
+        (topic, SKOS.inScheme, URIRef(BASE + "scheme")),
+    ):
+        graph.add(triple)
+    assert any("document-only page" in e for e in validate_rdf_semantics(graph, BASE))
+
+
+def test_conflicting_source_types_cannot_override_a_document_only_role():
+    graph = _graph()
+    graph.add((_page("maths/free_energy"), URIRef(BASE + "vocab/pageType"), Literal("guide")))
+    assert any("document-only page" in e for e in validate_rdf_semantics(graph, BASE))
+
+
+@pytest.mark.parametrize("path", ["biology/stress response", "biology/β cells", "biology/%41GENTS"])
+def test_encoded_local_paths_keep_exact_document_topic_iris(path):
+    graph = build_rdf_graph(
+        GraphDocument("demo", nodes=[NodeRecord(path, "Topic")]), namespace_base=BASE
+    )
+    suffix = quote(path, safe="/._-~")
+    assert (_page(suffix), SCHEMA.about, _concept(suffix)) in graph
+    assert validate_rdf_semantics(graph, BASE) == []
+
+
+def test_external_subjects_and_sparql_imports_keep_their_original_term_identity():
+    external_page = URIRef("https://example.org/document")
+    external_topic = URIRef("https://example.org/topic")
+    graph = rdflib.Graph()
+    graph.add((external_page, RDF.type, SCHEMA.CreativeWork))
+    for predicate in (SCHEMA.about, DCTERMS.subject):
+        graph.add((external_page, predicate, external_topic))
+    assert validate_rdf_semantics(graph, BASE) == []
+    doc = GraphDocument(
+        "demo",
+        nodes=[NodeRecord(str(_page("citations/paper")), "Paper", node_type="uri")],
+        edges=[
+            EdgeRecord(str(_page("citations/paper")), str(_concept("other")), str(SCHEMA.about))
+        ],
+        metadata={"source": "sparql"},
+    )
+    imported = build_rdf_graph(doc, namespace_base=BASE)
+    assert (_page("citations/paper"), SCHEMA.about, _concept("other")) in imported
+    assert validate_rdf_semantics(imported, BASE, entity_model=False) == []
 
 
 def test_model_modules_import_without_runtime_file_or_network_io():
