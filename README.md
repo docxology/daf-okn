@@ -65,10 +65,15 @@ See [canonical RDF and cross-graph workflows](docs/okn/cross-graph.md).
 | `daf-okn status --graph FILE [--report FILE]` | Read-only JSON observation of graph invariants and optional report consistency; exits 1 for missing, malformed or inconsistent evidence. |
 | `daf-okn visualize --graph FILE [--figure PNG] [--dashboard HTML] [--metrics JSON] [--layout NAME]` | Render the network figure and the HTML dashboard (`--no-figure` / `--no-dashboard` skip one). |
 | `daf-okn package --graph FILE --out-dir DIR [--fmt nq] [--preset NAME] [--entry-*] [--contact ...]` | Write the contribution package; exits 1 and lists problems if the entry is incomplete. |
+| `daf-okn join --source FILE --query FILE --output DIR [--replay CAPTURE]` | Capture or replay the bounded cognitive-to-OBO assertion path. |
+| `daf-okn explain-join --source FILE --query FILE --capture DIR --output DIR [--check]` | Explain a verified schema-3 path with local review records and recorded remote bindings, offline. |
+| `daf-okn bundle-rdf --root COGNITIVE --output DIR [--check]` | Preserve and verify the canonical RDF and required review documentation. |
 
 Run `daf-okn <command> --help` for every option. `pull` and live `join` use the network, and
 `--kgs-path` avoids it for `list` and `snapshot`. `DAF_OKN_COGNITIVE_REPO` is the default for
-`export --repo`. Captured `join --replay` is offline.
+`export --repo`. Captured `join --replay` and `explain-join` are offline.
+The [explanation contract](docs/okn/join-explanations.md) keeps each mapping
+predicate, review record and captured response origin visible for inspection.
 
 The scripts in `scripts/` are thin wrappers over the same code (`scripts/10_research_workflow.py`
 chains pull, export, analyze and visualize for the research manuscript).

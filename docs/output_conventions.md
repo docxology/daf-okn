@@ -43,6 +43,13 @@ hash manifest and linked join results. `--replay` verifies and reuses those inpu
 offline. `daf-okn bundle-rdf` writes canonical RDF, graph documentation, registry
 files and `bundle.json`; `--check` validates the actual directory. Use a fresh
 output directory for each capture or bundle, preserving failures and earlier evidence.
+`daf-okn explain-join` produces a separately versioned offline support report in
+a fresh sibling directory; `--check` rederives and checks existing support against
+the same source/query/capture inputs. Its producer lives in
+`analysis/join_explanation.py`, with the pure support model in
+`core/join_evidence.py`. Keep support artifacts outside the capture's strict
+inventory and the canonical RDF upload object. See the
+[explanation contract](okn/join-explanations.md) for filenames and bounds.
 
 | Artifact | Producer | Consumer |
 |---|---|---|

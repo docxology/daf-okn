@@ -54,6 +54,9 @@ def source_repo(tmp_path):
         "alignment-review.md",
         "entity-model.md",
         "keyword-curation-2026-10-23.md",
+        "curation-workflow.md",
+        "semantic-review.md",
+        "join-support.md",
     ):
         (docs / name).write_text("Documentation\n")
     (root / "LICENSE-KNOWLEDGE-BASE.md").write_text(LICENSE)
@@ -204,6 +207,27 @@ def test_rehashed_export_and_bundle_reject_wrong_topic_ownership_and_roles(tmp_p
     errors = submission.verify(bundle)
     assert any(expected in e for e in errors), errors
     assert not any("hash mismatch" in e or "inventory" in e for e in errors), errors
+
+
+@pytest.mark.parametrize(
+    "document", ["curation-workflow.md", "semantic-review.md", "join-support.md"]
+)
+def test_review_aids_are_required_even_if_a_bundle_receipt_omits_them(tmp_path, document):
+    """A rewritten receipt cannot silently remove the graph's review handoff."""
+    root = source_repo(tmp_path)
+    output = tmp_path / "review-bundle"
+    submission.prepare(root, output)
+    required = {"curation-workflow.md", "semantic-review.md", "join-support.md"}
+    assert required <= {path.name for path in output.iterdir()}
+    assert submission.verify(output) == []
+    (output / document).unlink()
+    receipt_path = output / "bundle.json"
+    receipt = json.loads(receipt_path.read_text())
+    receipt["files"].pop(document)
+    receipt_path.write_text(json.dumps(receipt))
+    errors = submission.verify(output)
+    assert errors and any("bundle inventory mismatch" in error for error in errors)
+    assert any(document in error for error in errors)
 
 
 def test_bundle_preserves_canonical_graph_and_verifies_actual_files(tmp_path):

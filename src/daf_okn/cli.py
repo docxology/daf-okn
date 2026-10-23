@@ -14,6 +14,8 @@ Commands (each is a thin wrapper over the library):
                    (:mod:`daf_okn.figures`, :mod:`daf_okn.dashboard`).
 * ``package``   -- OKN contribution package: RDF with standard vocabularies, registry
                    entry and checklist (:mod:`daf_okn.core.contribute`).
+* ``explain-join`` -- offline assertion-path support for a verified schema-3 capture
+                   (:mod:`daf_okn.analysis.join_explanation`).
 
 Exit status is 0 on success and 1 on a reported failure; argument errors exit 2.
 """
@@ -54,6 +56,13 @@ def _cmd_join(args: argparse.Namespace) -> int:
     cross_graph.run(
         cross_graph.JoinOptions(args.source, args.query, args.output, args.endpoint, args.replay)
     )
+    return 0
+
+
+def _cmd_explain_join(args: argparse.Namespace) -> int:
+    from .analysis.join_explanation import ExplainOptions, explain_join
+
+    explain_join(ExplainOptions(args.source, args.query, args.capture, args.output, args.check))
     return 0
 
 
@@ -301,6 +310,13 @@ def build_parser() -> argparse.ArgumentParser:
     join.add_argument("--endpoint", default=cross_graph.ENDPOINT)
     join.add_argument("--replay", type=Path, help="captured response directory")
     join.set_defaults(func=_cmd_join)
+    explain = commands.add_parser("explain-join", help="explain a verified schema-3 join offline")
+    for flag in ("source", "query", "capture", "output"):
+        explain.add_argument("--" + flag, required=True, type=Path)
+    explain.add_argument(
+        "--check", action="store_true", help="recompute existing support without writes"
+    )
+    explain.set_defaults(func=_cmd_explain_join)
     bundle = commands.add_parser("bundle-rdf", help="verify and package canonical cognitive RDF")
     bundle.add_argument("--root", default=Path("."), type=Path)
     bundle.add_argument("--output", required=True, type=Path)

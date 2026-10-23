@@ -22,7 +22,7 @@ daf-okn join --source cognitive/output/okn/cognitive-kb.nq \
   --output output/cognitive-live-capture
 daf-okn join --source cognitive/output/okn/cognitive-kb.nq \
   --query cognitive/docs/okn/queries/cross_graph_obo.rq \
-  --replay cognitive/docs/okn/evidence/2026-10-20-graph-methods \
+  --replay cognitive/docs/okn/evidence/2026-10-23-entity-model \
   --output output/cognitive-replay
 ```
 
@@ -65,6 +65,31 @@ The remote mapping graph's
 not establish identity between a page and an ontology class. This command adds
 no equivalence assertions to the submitted graph.
 
+## Inspect the assertion path
+
+Use the optional [offline explanation workflow](join-explanations.md) to inspect
+the local `exactMatch` or `closeMatch`, its complete review records, and the
+recorded remote mapping and label bindings. Its separately versioned support
+report lives beside the capture. Existing captures, result bytes and replay
+contracts remain preserved.
+
+```bash
+daf-okn explain-join --source cognitive/output/okn/cognitive-kb.nq \
+  --query cognitive/docs/okn/queries/cross_graph_obo.rq \
+  --capture cognitive/docs/okn/evidence/2026-10-23-entity-model \
+  --output output/cognitive-join-support
+daf-okn explain-join --source cognitive/output/okn/cognitive-kb.nq \
+  --query cognitive/docs/okn/queries/cross_graph_obo.rq \
+  --capture cognitive/docs/okn/evidence/2026-10-23-entity-model \
+  --output output/cognitive-join-support --check
+```
+
+The first support profile uses schema-3 captures and complete local review
+records. A review explains its specific local assertion; the remote assertion
+retains its own capture origin. Typed label alternatives and repeated bindings
+remain visible. The report records an assertion path and performs no composed
+mapping inference.
+
 ## Bundle canonical RDF
 
 ```bash
@@ -83,6 +108,11 @@ mapping evidence, concept-valued keywords and relation scopes, plus the entity
 model and keyword curation notes. Semantic checks reject literal
 keywords, undeclared local keyword concepts, custom citation predicates and
 SKOS mappings without complete source/rationale/date evidence.
+The required handoff also includes the endpoint curation workflow, generated
+semantic review queue and explanation guide. These help inspect unresolved
+source interpretations and mapping paths; only the canonical N-Quads are a
+registry RDF input. JSON review queues and explanation artifacts remain separate
+repository evidence with their own generation/check workflows.
 The check rejects changed, missing, extra or escaping files. An existing output
 directory is not overwritten. Partial failed bundles remain available for diagnosis.
 The required payload is defined by `BUNDLE_FILES` in

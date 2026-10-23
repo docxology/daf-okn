@@ -9,6 +9,11 @@ byte-preserving submission packaging and verification live in
 `src/daf_okn/core/rdf_submission.py`. Their command parsing is in
 `src/daf_okn/cli.py` (`join`, `bundle-rdf`). These methods consume cognitive's
 canonical artifacts rather than importing its exporter or duplicating its graph.
+Optional offline assertion-path explanations use
+`analysis/join_explanation.py` for verified file orchestration and
+`core/join_evidence.py` for pure projection and serialization. `explain-join`
+publishes a separate support artifact after recomputing both captured reports;
+the original capture and replay contracts remain unchanged.
 
 The `daf_okn` project is designed around a strict separation of concerns across three layers. Understanding this architecture before modifying any file prevents the most common errors: project logic appearing in scripts, reusable graph behavior remaining trapped in CLI files, and mocks appearing in tests.
 

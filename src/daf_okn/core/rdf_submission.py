@@ -35,6 +35,9 @@ DOCUMENT_FILES = (
     "docs/okn/alignment-review.md",
     "docs/okn/entity-model.md",
     "docs/okn/keyword-curation-2026-10-23.md",
+    "docs/okn/curation-workflow.md",
+    "docs/okn/semantic-review.md",
+    "docs/okn/join-support.md",
 )
 QUERY_FILES = (
     "concept_mappings.rq",

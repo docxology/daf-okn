@@ -85,6 +85,16 @@ class JoinOptions:
     replay: Path | None = None
 
 
+@dataclass(frozen=True, slots=True)
+class JoinEvaluation:
+    """Original serialized report and pre-stringification SELECT solutions."""
+
+    result: dict[str, Any]
+    typed_rows: tuple[dict[str, URIRef | Literal], ...]
+    json_bytes: bytes
+    markdown_bytes: bytes
+
+
 def digest(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
@@ -280,21 +290,22 @@ def _reject_remote_clauses(node) -> None:
         raise JoinError(f"offline join query cannot contain {node.name}")
 
 
-def write_results(
+def evaluate_results(
     dataset: Dataset,
     query: Path,
     settings: tuple[Path, str],
     *,
     provenance: dict[str, Any] | None = None,
     schema_version: int = 3,
-) -> None:
+) -> JoinEvaluation:
+    """Evaluate and validate the existing join without publishing result files."""
     # WHY: rdflib's SPARQL plugin reads distribution metadata on import.
     from rdflib.plugins.sparql.algebra import traverse
     from rdflib.plugins.sparql.parser import parseQuery
 
     if type(schema_version) is not int or schema_version not in {1, 2, 3}:
         raise JoinError(f"unsupported join result schema: {schema_version!r}")
-    output, observed_at = settings
+    _, observed_at = settings
     text = read_bounded(regular_file(query.parent, query.name), MAX_BYTES).decode("utf-8")
     try:
         syntax = parseQuery(text)
@@ -310,6 +321,7 @@ def write_results(
             f"join SELECT must project {', '.join(sorted(required))} for schema {schema_version}"
         )
     rows: list[JoinedRow] = []
+    typed_rows: list[dict[str, URIRef | Literal]] = []
     matched_pages: set[str] = set()
     local = dataset.graph(URIRef(GRAPH))
     if schema_version == 3:
@@ -358,6 +370,13 @@ def write_results(
             or not str(row["external"]).startswith(OBO)
         ):
             raise JoinError("join row is not supported by the three named source graphs")
+        typed: dict[str, URIRef | Literal] = {}
+        for name in sorted(required):
+            value = row[name]
+            if not isinstance(value, (URIRef, Literal)):
+                raise JoinError(f"unsupported projected RDF term: {name}: {value!r}")
+            typed[name] = value
+        typed_rows.append(typed)
         joined = JoinedRow(
             concept=str(row["concept"]),
             label=str(row["label"]),
@@ -385,14 +404,40 @@ def write_results(
         result["matched_concepts"] = len({row["concept"] for row in rows})
     if provenance is not None:
         result["provenance"] = provenance
-    output.mkdir(parents=True, exist_ok=True)
     payload = (json.dumps(result, indent=2) + "\n").encode("utf-8")
     if len(payload) > MAX_MANIFEST_BYTES:
         raise JoinError(f"join results exceed {MAX_MANIFEST_BYTES} byte size limit")
-    (output / "join-results.json").write_bytes(payload)
-    (output / "join-results.md").write_text(markdown_report(rows, observed_at), encoding="utf-8")
+    return JoinEvaluation(
+        result,
+        tuple(typed_rows),
+        payload,
+        markdown_report(rows, observed_at).encode("utf-8"),
+    )
+
+
+def write_results(
+    dataset: Dataset,
+    query: Path,
+    settings: tuple[Path, str],
+    *,
+    provenance: dict[str, Any] | None = None,
+    schema_version: int = 3,
+) -> None:
+    """Publish the established join report, retaining its bytes and stdout."""
+    evaluation = evaluate_results(
+        dataset, query, settings, provenance=provenance, schema_version=schema_version
+    )
+    output, _ = settings
+    output.mkdir(parents=True, exist_ok=True)
+    (output / "join-results.json").write_bytes(evaluation.json_bytes)
+    (output / "join-results.md").write_text(
+        evaluation.markdown_bytes.decode("utf-8"), encoding="utf-8"
+    )
     print(
-        json.dumps({k: v for k, v in result.items() if k not in {"rows", "provenance"}}, indent=2)
+        json.dumps(
+            {k: v for k, v in evaluation.result.items() if k not in {"rows", "provenance"}},
+            indent=2,
+        )
     )
 
 
