@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import importlib
 import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -17,6 +18,7 @@ SCRIPTS_DIR = REPO_ROOT / "scripts"
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
+from daf_okn.core.cognitive_adapter import separate_document_topics  # noqa: E402
 from daf_okn.core.contribute import (  # noqa: E402
     PRESET_ENTRIES,
     _entry_from_metadata,
@@ -30,6 +32,11 @@ from daf_okn.core.contribute import (  # noqa: E402
     validate_package,
 )
 from daf_okn.core.graph import EdgeRecord, GraphDocument, NodeRecord  # noqa: E402
+from daf_okn.core.rdf import (  # noqa: E402
+    build_rdf_graph,
+    default_namespace_base,
+    validate_rdf_semantics,
+)
 
 register_graph = importlib.import_module("register_graph")
 
@@ -130,7 +137,9 @@ def test_package_rejects_aliased_output_files_before_writing(tmp_path: Path, kin
 
 
 @pytest.mark.parametrize("defect", ["dangling", "duplicate", "empty", "self-loop"])
+@rdflib_parser_warnings
 def test_package_reports_structural_invariants(tmp_path: Path, defect: str) -> None:
+    """Structural failures retain reviewable drafts and never repair missing nodes."""
     doc = _sample_doc()
     changes = {
         "dangling": lambda: doc.edges.append(EdgeRecord("area/one", "missing")),
@@ -144,6 +153,71 @@ def test_package_reports_structural_invariants(tmp_path: Path, defect: str) -> N
     problems = validate_package(doc, tmp_path / "package")
 
     assert expected and set(expected) <= set(problems)
+    out_dir = tmp_path / "package"
+    entry_text = (out_dir / "registry" / registry_entry_path(doc.name)).read_text()
+    checklist = (out_dir / "checklist.md").read_text()
+    for text in (entry_text, checklist):
+        assert "Diagnostic draft" in text
+        assert "Do not upload or publish" in text
+        assert all(problem in text for problem in problems)
+    dataset = rdflib.Dataset()
+    dataset.parse(out_dir / f"{doc.name}.nq", format="nquads")
+    graph = dataset.graph(rdflib.URIRef(default_namespace_base(doc.name).rstrip("/")))
+    if defect == "dangling":
+        base = default_namespace_base(doc.name)
+        missing = rdflib.URIRef(base + "page/missing")
+        assert (
+            rdflib.URIRef(base + "page/area/one"),
+            rdflib.URIRef(base + "relation/document/related"),
+            missing,
+        ) in graph
+        assert not list(graph.triples((missing, None, None)))
+        assert f"page requires CreativeWork type: {missing}" in problems
+
+
+@rdflib_parser_warnings
+def test_package_reports_semantic_failure_without_structural_failure(tmp_path: Path) -> None:
+    """A valid graph structure cannot hide a forbidden document SKOS mapping."""
+    doc = _sample_doc()
+    for node in doc.nodes:
+        node.node_type = "overview"
+    doc = separate_document_topics(doc)
+    doc.edges.append(EdgeRecord("area/one", "area/two", "skos:exactMatch"))
+    original = doc.to_dict()
+    assert doc.validate() == []
+    with pytest.raises(ValueError, match="mapping endpoints must be distinct concepts"):
+        build_rdf_graph(doc)
+
+    problems = validate_package(doc, tmp_path)
+
+    dataset = rdflib.Dataset()
+    dataset.parse(tmp_path / "demo-graph.nq", format="nquads")
+    base = default_namespace_base(doc.name)
+    graph = dataset.graph(rdflib.URIRef(base.rstrip("/")))
+    assert (
+        rdflib.URIRef(base + "page/area/one"),
+        rdflib.SKOS.exactMatch,
+        rdflib.URIRef(base + "page/area/two"),
+    ) in graph
+    assert problems == validate_rdf_semantics(graph, base)
+    assert any("mapping lacks complete review evidence" in problem for problem in problems)
+    assert "Diagnostic draft" in (tmp_path / "checklist.md").read_text()
+    assert doc.to_dict() == original
+
+
+def test_package_propagates_source_construction_errors(tmp_path: Path) -> None:
+    """Diagnostic packaging must not swallow source errors or replace prior files."""
+    doc = _sample_doc()
+    doc.nodes[0].attributes["entity_role"] = "document"
+    sentinel = tmp_path / "demo-graph.nq"
+    sentinel.write_text("preserve previous evidence")
+
+    with pytest.raises(ValueError, match="unversioned entity role on node 'area/one'"):
+        validate_package(doc, tmp_path)
+
+    assert sentinel.read_text() == "preserve previous evidence"
+    assert not (tmp_path / "registry").exists()
+    assert not (tmp_path / "checklist.md").exists()
 
 
 def _frontmatter(text: str) -> dict[str, object]:
@@ -428,7 +502,9 @@ def test_validate_package_reports_unsupported_fmt(tmp_path: Path) -> None:
     assert len(list(dataset.quads((None, None, None, None)))) > 0
 
 
+@rdflib_parser_warnings
 def test_validate_package_reports_empty_name_and_non_iri_ids(tmp_path: Path) -> None:
+    """An unnamed graph still reports every fault and retains its actual dangling edge."""
     doc = GraphDocument(
         name="",
         nodes=[NodeRecord(id="has space", title="Spaced")],
@@ -444,6 +520,18 @@ def test_validate_package_reports_empty_name_and_non_iri_ids(tmp_path: Path) -> 
     assert "non-IRI-safe edge target" not in str(problems)
     assert (tmp_path / "graph.nq").exists()
     assert (tmp_path / "registry" / registry_entry_path("graph")).exists()
+    assert set(doc.validate()) <= set(problems)
+    graph = rdflib.Graph().parse(tmp_path / "graph.nq", format="nt")
+    base = default_namespace_base("graph")
+    missing = rdflib.URIRef(base + "page/ok")
+    assert (
+        rdflib.URIRef(base + "page/has%20space"),
+        rdflib.URIRef(base + "relation/document/relates"),
+        missing,
+    ) in graph
+    assert not list(graph.triples((missing, None, None)))
+    assert f"page requires CreativeWork type: {missing}" in problems
+    assert "Diagnostic draft" in (tmp_path / "checklist.md").read_text()
 
 
 def test_validate_package_accepts_absolute_iri_node_ids(tmp_path: Path) -> None:
@@ -455,6 +543,56 @@ def test_validate_package_accepts_absolute_iri_node_ids(tmp_path: Path) -> None:
         },
     )
     assert [p for p in validate_package(doc, tmp_path) if "IRI" in p] == []
+
+
+def test_package_accepts_real_exported_topic_identifiers(tmp_path: Path) -> None:
+    """The vault export must remain packageable with its distinct topic IDs."""
+    from daf_okn.core.cognitive_adapter import build_cognitive_graph
+
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    (vault / "one.md").write_text(
+        "---\ntitle: One\ntype: concept\nsemantic_relations:\n"
+        '  - type: foundation_for\n    links: ["[[two]]"]\n---\n',
+        encoding="utf-8",
+    )
+    (vault / "two.md").write_text("---\ntitle: Two\ntype: concept\n---\n", encoding="utf-8")
+    doc = build_cognitive_graph(vault, name="topics")
+    doc.metadata["entry"] = {
+        "contacts": [CONTACT],
+        "homepage": "https://example.org",
+        "description": "Topics",
+    }
+    assert validate_package(doc, tmp_path / "package") == []
+    dataset = rdflib.Dataset().parse(tmp_path / "package/topics.nq", format="nquads")
+    graph = dataset.graph(rdflib.URIRef("https://purl.org/okn/frink/kg/topics"))
+    base = "https://purl.org/okn/frink/kg/topics/"
+    assert (
+        rdflib.URIRef(base + "page/one"),
+        rdflib.SDO.about,
+        rdflib.URIRef(base + "concept/one"),
+    ) in graph
+    assert (
+        rdflib.URIRef(base + "concept/one"),
+        rdflib.URIRef(base + "relation/foundation_for"),
+        rdflib.URIRef(base + "concept/two"),
+    ) in graph
+
+
+def test_unmodeled_concept_prefix_does_not_bypass_id_validation(tmp_path: Path) -> None:
+    """Only declared topic-role IDs receive the internal concept prefix policy."""
+    doc = GraphDocument(
+        name="unmodeled",
+        nodes=[NodeRecord(id="concept:one", title="One", node_type="overview")],
+        metadata={
+            "entry": {
+                "contacts": [CONTACT],
+                "homepage": "https://example.org",
+                "description": "One",
+            }
+        },
+    )
+    assert "non-IRI-safe node id: 'concept:one'" in validate_package(doc, tmp_path)
 
 
 def test_reserved_prefix_ids_are_accepted_by_policy(tmp_path: Path) -> None:
@@ -506,6 +644,61 @@ def test_preset_is_not_applied_implicitly(tmp_path: Path) -> None:
 
 
 # --------------------------------------------------------------------------------- CLI
+@pytest.mark.parametrize("defect", ["dangling-source", "dangling-target", "semantic", "valid"])
+@rdflib_parser_warnings
+def test_package_subprocess_rejects_diagnostic_drafts(tmp_path: Path, defect: str) -> None:
+    """The real CLI rejects malformed sources even with complete registry metadata."""
+    doc = _sample_doc()
+    if defect == "dangling-source":
+        doc.edges.append(EdgeRecord("missing", "area/one"))
+    elif defect == "dangling-target":
+        doc.edges.append(EdgeRecord("area/one", "missing"))
+    elif defect == "semantic":
+        for node in doc.nodes:
+            node.node_type = "overview"
+        doc = separate_document_topics(doc)
+        doc.edges.append(EdgeRecord("area/one", "area/two", "skos:exactMatch"))
+    graph_path = doc.save_json(tmp_path / "source.json")
+    original_bytes = graph_path.read_bytes()
+    out_dir = tmp_path / "package"
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "daf_okn",
+            "package",
+            "--graph",
+            str(graph_path),
+            "--out-dir",
+            str(out_dir),
+        ],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == (0 if defect == "valid" else 1), result.stdout + result.stderr
+    assert result.stderr == ""
+    assert graph_path.read_bytes() == original_bytes
+    dataset = rdflib.Dataset()
+    dataset.parse(out_dir / "demo-graph.nq", format="nquads")
+    base = default_namespace_base(doc.name)
+    graph = dataset.graph(rdflib.URIRef(base.rstrip("/")))
+    semantic_errors = validate_rdf_semantics(graph, base)
+    checklist = (out_dir / "checklist.md").read_text()
+    if defect == "valid":
+        assert "Wrote package" in result.stdout
+        assert semantic_errors == []
+        assert "Diagnostic draft" not in checklist
+    else:
+        assert "Wrote package" not in result.stdout
+        assert semantic_errors
+        assert all(problem in result.stdout for problem in [*doc.validate(), *semantic_errors])
+        assert "Diagnostic draft" in checklist
+
+
 def test_main_package_writes_files_and_prints_summary(tmp_path: Path, capsys) -> None:
     graph_path = tmp_path / "source" / "graph.json"
     _sample_doc().save_json(graph_path)

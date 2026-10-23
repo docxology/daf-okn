@@ -16,13 +16,11 @@ from urllib.request import Request, urlopen
 from pyparsing import ParseException
 from rdflib import Dataset, Literal, URIRef
 from rdflib.exceptions import ParserError
-from rdflib.plugins.sparql.algebra import traverse
-from rdflib.plugins.sparql.parser import parseQuery
-from rdflib.plugins.sparql.parserutils import CompValue
 from rdflib.query import ResultRow
 
 from daf_okn.core.alignment import checked_iri as alignment_iri
 from daf_okn.core.join_report import JoinedRow, markdown_report
+from daf_okn.core.rdf import SCHEMA, validate_entity_model
 from daf_okn.core.rdf_submission import (
     MAX_MANIFEST_BYTES,
     file_inventory,
@@ -48,6 +46,12 @@ EXACT: Final = PREFIXES["skos"] + "exactMatch"
 LABEL: Final = PREFIXES["rdfs"] + "label"
 OBO: Final = "http://purl.obolibrary.org/obo/"
 MAX_BYTES: Final = 4 * 1024 * 1024
+
+
+class DocumentJoinedRow(JoinedRow):
+    """Current join projection, including the document supporting a topic/source."""
+
+    page: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -252,7 +256,7 @@ def add_captures(dataset: Dataset, captures: list[Capture], directory: Path) -> 
             target.add(triple)
 
 
-def local_dataset(source: Path) -> Dataset:
+def local_dataset(source: Path, *, entity_model: bool = True) -> Dataset:
     dataset = Dataset()
     try:
         dataset.parse(regular_file(source.parent, source.name), format="nquads")
@@ -262,10 +266,16 @@ def local_dataset(source: Path) -> Dataset:
         raise JoinError("local export contains an unexpected named graph")
     if not len(dataset.graph(URIRef(GRAPH))):
         raise JoinError("local export has no cognitive-kb named graph")
+    if entity_model:
+        errors = validate_entity_model(dataset.graph(URIRef(GRAPH)), GRAPH)
+        if errors:
+            raise JoinError("invalid document/concept model: " + "; ".join(errors))
     return dataset
 
 
 def _reject_remote_clauses(node) -> None:
+    from rdflib.plugins.sparql.parserutils import CompValue
+
     if isinstance(node, CompValue) and node.name in {"ServiceGraphPattern", "DatasetClause"}:
         raise JoinError(f"offline join query cannot contain {node.name}")
 
@@ -276,7 +286,14 @@ def write_results(
     settings: tuple[Path, str],
     *,
     provenance: dict[str, Any] | None = None,
+    schema_version: int = 3,
 ) -> None:
+    # WHY: rdflib's SPARQL plugin reads distribution metadata on import.
+    from rdflib.plugins.sparql.algebra import traverse
+    from rdflib.plugins.sparql.parser import parseQuery
+
+    if type(schema_version) is not int or schema_version not in {1, 2, 3}:
+        raise JoinError(f"unsupported join result schema: {schema_version!r}")
     output, observed_at = settings
     text = read_bounded(regular_file(query.parent, query.name), MAX_BYTES).decode("utf-8")
     try:
@@ -286,12 +303,21 @@ def write_results(
     traverse(syntax, visitPre=_reject_remote_clauses)
     result_rows = dataset.query(text)
     required = {"concept", "label", "wikidata", "external", "externalLabel", "source"}
+    if schema_version == 3:
+        required.add("page")
     if result_rows.type != "SELECT" or {str(value) for value in result_rows.vars or []} != required:
         raise JoinError(
-            "join SELECT must project concept, label, wikidata, external, externalLabel, source"
+            f"join SELECT must project {', '.join(sorted(required))} for schema {schema_version}"
         )
     rows: list[JoinedRow] = []
+    matched_pages: set[str] = set()
     local = dataset.graph(URIRef(GRAPH))
+    if schema_version == 3:
+        errors = validate_entity_model(local, GRAPH)
+        if errors:
+            raise JoinError("invalid document/concept model: " + "; ".join(errors))
+    elif any(str(s).startswith(GRAPH + "/concept/") for s in local.subjects()):
+        raise JoinError("historical capture schema cannot replay the document/concept model")
     mapping_graph = dataset.graph(URIRef(MAPPINGS))
     label_graph = dataset.graph(URIRef(UBERGRAPH))
     join_keys = set(_wikidata_subjects(dataset))
@@ -300,17 +326,28 @@ def write_results(
             raise JoinError("join query must return SELECT rows")
         if any(row[name] is None for name in required):
             raise JoinError("join SELECT returned an unbound required value")
-        if not all(
-            isinstance(row[name], URIRef) for name in ("concept", "wikidata", "external", "source")
-        ) or not all(isinstance(row[name], Literal) for name in ("label", "externalLabel")):
+        iri_names = {"concept", "wikidata", "external", "source"}
+        if schema_version == 3:
+            iri_names.add("page")
+        if not all(isinstance(row[name], URIRef) for name in iri_names) or not all(
+            isinstance(row[name], Literal) for name in ("label", "externalLabel")
+        ):
             raise JoinError("join SELECT returned invalid RDF term types")
-        for name in ("concept", "wikidata", "external", "source"):
+        for name in iri_names:
             checked_iri(str(row[name]))
         if (
             (row["concept"], URIRef(PREFIXES["rdf"] + "type"), URIRef(PREFIXES["skos"] + "Concept"))
             not in local
             or (row["concept"], URIRef(PREFIXES["skos"] + "prefLabel"), row["label"]) not in local
-            or (row["concept"], URIRef(PREFIXES["dcterms"] + "source"), row["source"]) not in local
+            or not (
+                (row["concept"], URIRef(PREFIXES["dcterms"] + "source"), row["source"]) in local
+                if schema_version < 3
+                else str(row["concept"]).startswith(GRAPH + "/concept/")
+                and (row["page"], URIRef(PREFIXES["rdf"] + "type"), SCHEMA.CreativeWork) in local
+                and (row["page"], SCHEMA.about, row["concept"]) in local
+                and (row["page"], URIRef(PREFIXES["dcterms"] + "subject"), row["concept"]) in local
+                and (row["page"], URIRef(PREFIXES["dcterms"] + "source"), row["source"]) in local
+            )
             or not any(
                 (row["concept"], URIRef(PREFIXES["skos"] + relation), row["wikidata"]) in local
                 for relation in ("exactMatch", "closeMatch")
@@ -321,24 +358,31 @@ def write_results(
             or not str(row["external"]).startswith(OBO)
         ):
             raise JoinError("join row is not supported by the three named source graphs")
-        rows.append(
-            JoinedRow(
-                concept=str(row["concept"]),
-                label=str(row["label"]),
-                wikidata=str(row["wikidata"]),
-                external=str(row["external"]),
-                externalLabel=str(row["externalLabel"]),
-                source=str(row["source"]),
-            )
+        joined = JoinedRow(
+            concept=str(row["concept"]),
+            label=str(row["label"]),
+            wikidata=str(row["wikidata"]),
+            external=str(row["external"]),
+            externalLabel=str(row["externalLabel"]),
+            source=str(row["source"]),
         )
+        if schema_version == 3:
+            rows.append(DocumentJoinedRow(**joined, page=str(row["page"])))
+            matched_pages.add(str(row["page"]))
+        else:
+            rows.append(joined)
+            matched_pages.add(str(row["concept"]))
     if not rows:
         raise JoinError("cross-graph join returned zero rows")
     result: dict[str, Any] = {
         "joined_rows": len(rows),
-        "matched_pages": len({row["concept"] for row in rows}),
+        "matched_pages": len(matched_pages),
         "external_terms": len({row["external"] for row in rows}),
         "rows": rows,
     }
+    if schema_version == 3:
+        result["schema_version"] = 3
+        result["matched_concepts"] = len({row["concept"] for row in rows})
     if provenance is not None:
         result["provenance"] = provenance
     output.mkdir(parents=True, exist_ok=True)
@@ -398,8 +442,8 @@ def _replay_manifest(
     version = manifest.get("schema_version", 1)
     if (
         type(version) is not int
-        or version not in {1, 2}
-        or set(manifest) != required | ({"schema_version", "files"} if version == 2 else set())
+        or version not in {1, 2, 3}
+        or set(manifest) != required | ({"schema_version", "files"} if version >= 2 else set())
     ):
         raise JoinError("unsupported or malformed captured join manifest schema")
     if (
@@ -442,7 +486,7 @@ def _replay_manifest(
     actual = file_inventory(snapshot)
     result_files = {"join-results.json", "join-results.md"}
     expected = names | {"manifest.json"}
-    if version == 2:
+    if version >= 2:
         expected |= result_files | {"join-query.rq"}
         files = hash_inventory(manifest["files"], "captured files")
         if set(files) != expected - {"manifest.json"}:
@@ -501,7 +545,6 @@ def _replay_stages(
 
 def _run(args: JoinOptions) -> None:
     source, query = Path(args.source), Path(args.query)
-    dataset = local_dataset(source)
     out = Path(args.output)
     if any(parent.is_symlink() for parent in (out, *out.absolute().parents)):
         raise JoinError(f"symlink is not a join output destination: {out}")
@@ -511,8 +554,10 @@ def _run(args: JoinOptions) -> None:
     if args.replay:
         snapshot = Path(args.replay)
         manifest, captures = _replay_manifest(snapshot, source, query)
+        dataset = local_dataset(source, entity_model=manifest.get("schema_version", 1) == 3)
         _replay_stages(dataset, captures, snapshot, manifest)
     else:
+        dataset = local_dataset(source)
         out.mkdir(parents=True, exist_ok=False)
         subjects = _wikidata_subjects(dataset)
         if not subjects:
@@ -531,14 +576,20 @@ def _run(args: JoinOptions) -> None:
             "requested_wikidata_keys": len(subjects),
             "requested_obo_terms": len(external),
         }
-    write_results(dataset, query, (out, manifest["observed_at"]), provenance=_provenance(manifest))
-    if args.replay and manifest.get("schema_version") == 2:
+    write_results(
+        dataset,
+        query,
+        (out, manifest["observed_at"]),
+        provenance=_provenance(manifest),
+        schema_version=manifest.get("schema_version", 1) if args.replay else 3,
+    )
+    if args.replay and manifest.get("schema_version", 1) >= 2:
         for name in ("join-results.json", "join-results.md"):
             if sha256(regular_file(out, name)) != manifest["files"][name]:
                 raise JoinError(f"captured result differs from recomputed join: {name}")
     if not args.replay:
         (out / "join-query.rq").write_bytes(read_bounded(query, MAX_BYTES))
-        manifest["schema_version"] = 2
+        manifest["schema_version"] = 3
         manifest["files"] = {
             name: sha256(regular_file(out, name)) for name in sorted(file_inventory(out))
         }

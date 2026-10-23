@@ -123,12 +123,12 @@ def test_build_graph_node_ids_titles_and_folder_docs() -> None:
     assert by_id["agents/overview"].node_type == "overview"
     assert by_id["systems/overview"].node_type == "overview"
     markov = by_id["mathematics/markov_blanket"]
-    assert len(document.nodes) == 11
+    assert len(document.nodes) == 17
     assert markov.title == "Markov Blanket"
     assert markov.node_type == "concept"
     assert markov.attributes["status"] == "stable"
     assert markov.attributes["tags"] == ["mathematics", "graphical_models"]
-    assert len(document.nodes) == 11
+    assert len(document.nodes) == 17
     assert document.name == "cognitive-kb"
 
 
@@ -137,7 +137,7 @@ def test_build_graph_default_collapses_redirects() -> None:
     document = build_cognitive_graph(FIXTURE_ROOT)
     by_id = {node.id: node for node in document.nodes}
     assert "cognitive/alias_redirect" not in by_id
-    assert len(by_id) == 11
+    assert len(by_id) == 17
     redirects_to = [edge for edge in document.edges if edge.relation == "redirects_to"]
     assert redirects_to == []
     # The redirect body's own wikilink becomes a self-loop artifact and drops.
@@ -146,8 +146,10 @@ def test_build_graph_default_collapses_redirects() -> None:
         "mathematics/free_energy_principle",
     ) not in [(edge.source, edge.target) for edge in document.edges]
     counts = document.metadata["counts"]
-    assert counts["nodes"] == 11
-    assert counts["edges"] == 15
+    assert counts["nodes"] == 17
+    assert counts["documents"] == 11
+    assert counts["concepts"] == 6
+    assert counts["edges"] == 27
     assert counts["redirect_edges"] == 0
     assert counts["semantic_edges"] == 7
     assert counts["wikilink_edges"] == 8
@@ -167,8 +169,8 @@ def test_build_graph_keep_redirects_keeps_node_and_edge() -> None:
         "mathematics/free_energy_principle",
         "redirects_to",
     ) in _edge_tuples(document, origin="redirect")
-    assert len(document.nodes) == 12
-    assert len(document.edges) == 17
+    assert len(document.nodes) == 18
+    assert len(document.edges) == 29
     assert document.metadata["counts"]["redirect_edges"] == 1
 
 
@@ -177,24 +179,24 @@ def test_build_graph_relations_and_origins() -> None:
     document = build_cognitive_graph(FIXTURE_ROOT)
     explicit = set(_edge_tuples(document, origin="explicit"))
     assert (
-        "mathematics/markov_blanket",
-        "mathematics/free_energy_principle",
+        "concept:mathematics/markov_blanket",
+        "concept:mathematics/free_energy_principle",
         "implements",
     ) in explicit
     assert (
-        "mathematics/markov_blanket",
-        "mathematics/bayesian_networks",
+        "concept:mathematics/markov_blanket",
+        "concept:mathematics/bayesian_networks",
         "extends",
     ) in explicit
     assert (
-        "mathematics/markov_blanket",
-        "cognitive/pattern_separation",
+        "concept:mathematics/markov_blanket",
+        "concept:cognitive/pattern_separation",
         "relates_to",
     ) in explicit
     assert (
-        "mathematics/markov_blanket",
-        "mathematics/bayesian_networks",
-        "part_of",
+        "concept:mathematics/markov_blanket",
+        "concept:mathematics/bayesian_networks",
+        "concept/part_of",
     ) in explicit
     assert (
         "mathematics/markov_blanket",
@@ -215,7 +217,8 @@ def test_build_graph_relations_and_origins() -> None:
         "related",
     ) in wikilinks
     assert all(
-        origin in {"explicit", "wikilink"} for origin in {edge.origin for edge in document.edges}
+        origin in {"explicit", "wikilink", "entity_model"}
+        for origin in {edge.origin for edge in document.edges}
     )
 
 
@@ -259,7 +262,7 @@ def test_build_graph_no_wikilinks_option() -> None:
     """include_wikilinks=False keeps only explicit semantic edges."""
     document = build_cognitive_graph(FIXTURE_ROOT, include_wikilinks=False)
     origins = {edge.origin for edge in document.edges}
-    assert origins == {"explicit"}
+    assert origins == {"explicit", "entity_model"}
     assert document.metadata["counts"]["wikilink_edges"] == 0
     assert document.metadata["counts"]["semantic_edges"] == 7
 
@@ -285,8 +288,8 @@ def test_export_cognitive_kb_round_trips(tmp_path: Path) -> None:
 
     restored = GraphDocument.load_json(out_path)
     assert restored.name == document.name
-    assert len(restored.nodes) == len(document.nodes) == 11
-    assert len(restored.edges) == len(document.edges) == 15
+    assert len(restored.nodes) == len(document.nodes) == 17
+    assert len(restored.edges) == len(document.edges) == 27
     assert restored.metadata["counts"] == document.metadata["counts"]
 
 
@@ -666,7 +669,7 @@ def test_generic_vault_has_no_cognitive_specific_requirements(tmp_path: Path) ->
         ("Home", "Beta"),
         ("Projects/Alpha", "Home"),
     }
-    assert {n.node_type for n in document.nodes} == {"concept"}
+    assert {n.node_type for n in document.nodes} == {"document"}
     assert validate_graph(document) == []
 
 
@@ -687,7 +690,8 @@ def test_extra_frontmatter_fields_become_node_attributes(tmp_path: Path) -> None
             "cite.md": (
                 "---\ntitle: Cite\ndescription: Short text\ncomplexity: advanced\n"
                 "authors: [A. One, B. Two]\nyear: 2022\njournal: J\ndoi: 10.1/x\n"
-                "wikidata: Q1\ncreated: 2024-01-02\nupdated: 2025-03-04\n---\n"
+                "wikidata: Q1\ncreated: 2024-01-02\nupdated: 2025-03-04\n"
+                "modified: 2026-10-23\nprocessing_priority: high\n---\n"
             )
         },
     )
@@ -698,6 +702,7 @@ def test_extra_frontmatter_fields_become_node_attributes(tmp_path: Path) -> None
     assert attrs["created"] == "2024-01-02"
     assert attrs["doi"] == "10.1/x" and attrs["wikidata"] == "Q1"
     assert attrs["journal"] == "J" and attrs["complexity"] == "advanced"
+    assert attrs["modified"] == "2026-10-23" and attrs["processing_priority"] == "high"
 
 
 def test_exported_json_contains_no_absolute_paths(tmp_path: Path) -> None:
@@ -717,3 +722,58 @@ def test_default_graph_name_distinguishes_cognitive_checkouts_from_plain_vaults(
     assert default_graph_name(checkout) == "cognitive-kb"
     assert default_graph_name(tmp_path / "Zettel Notes 2026") == "zettel-notes-2026"
     assert default_graph_name(Path("/")) == "vault"
+
+
+def test_only_declared_topics_get_separate_resources_and_mappings(tmp_path):
+    root = _vault(
+        tmp_path,
+        {
+            "topic.md": (
+                "---\ntype: concept\naliases: [An alias]\ndefinition: A topic definition\n"
+                "created: 2026-10-23\ntags: [precise_tag]\n---\n"
+            ),
+            "guide.md": "---\ntype: guide\n---\n",
+            "unknown.md": "---\ntype: unknown_editorial_role\n---\n",
+            "plain.md": "# Untyped document\n",
+            "citations/paper.md": "---\ntype: citation\n---\n",
+        },
+    )
+    document = build_cognitive_graph(root)
+    by_id = {node.id: node for node in document.nodes}
+    assert {n.id for n in document.nodes if n.attributes["entity_role"] == "concept"} == {
+        "concept:topic"
+    }
+    assert by_id["topic"].attributes["created"] == "2026-10-23"
+    assert by_id["topic"].attributes["tags"] == ["precise_tag"]
+    assert "definition" not in by_id["topic"].attributes
+    assert by_id["concept:topic"].attributes["definition"] == "A topic definition"
+    assert by_id["concept:topic"].attributes["aliases"] == ["An alias"]
+    assert "created" not in by_id["concept:topic"].attributes
+    assert set(_edge_tuples(document, "entity_model")) == {
+        ("topic", "concept:topic", r) for r in ("schema:about", "dcterms:subject")
+    }
+
+
+def test_unknown_and_mixed_relations_keep_document_assertions_for_curation(tmp_path):
+    root = _vault(
+        tmp_path,
+        {
+            "a.md": (
+                "---\ntype: concept\nsemantic_relations:\n- type: implements\n"
+                "  links: ['[[guide]]']\n- type: unreviewed_causal_name\n  links: ['[[b]]']\n"
+                "- type: documents\n  links: ['[[b]]']\n---\n"
+            ),
+            "b.md": "---\ntype: concept\n---\n",
+            "guide.md": "---\ntype: guide\n---\n",
+        },
+    )
+    document = build_cognitive_graph(root)
+    assert set(_edge_tuples(document, "explicit")) == {
+        ("a", "guide", "document/implements"),
+        ("a", "b", "document/unreviewed_causal_name"),
+        ("a", "b", "document/documents"),
+    }
+    assert document.metadata["document_assertions"] == [
+        {"source": "a", "target": "guide", "relation": "implements"},
+        {"source": "a", "target": "b", "relation": "unreviewed_causal_name"},
+    ]

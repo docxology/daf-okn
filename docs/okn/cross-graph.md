@@ -35,7 +35,7 @@ variables of cognitive's OBO query; it is not an arbitrary SPARQL runner.
 
 A capture contains the exact queries, raw SPARQL JSON responses, SHA-256 hashes,
 observation time, local-export hash and join-query hash in `manifest.json`.
-New captures use schema version 2 and also hash the stored `join-query.rq` and
+New captures use schema version 3 and also hash the stored `join-query.rq` and
 both result files. Result JSON records structured provenance for its source,
 query, endpoint, observation time and individual remote captures.
 `join-results.json` contains all joined rows; `join-results.md` provides linked
@@ -45,10 +45,17 @@ Changing the export or query requires a new capture, preserving the old one.
 Replay derives the entire ordered batch inventory from the local keys and first
 stage responses, including batches that returned no triples. It rejects omitted,
 duplicated or unexpected batches, changed counts, unrecorded files, symlinks,
-malformed JSON and unsupported schema versions. Version 2 also compares the
+malformed JSON and unsupported schema versions. Versions 2 and 3 compare the
 recomputed results with the captured results. Original manifests without a
 schema version remain readable under their original response/query hash
 contract; their optional result summaries are recomputed rather than trusted.
+
+Schema 3 requires the [document/concept model](entity-model.md). Queries still
+project page, concept, label, wikidata, external, externalLabel and source, and obtain
+source from a CreativeWork document linked to the concept by both schema:about
+and dcterms:subject. The row validator verifies that supporting document in the
+local named graph. Historical schemas 1 and 2 retain their original six-variable concept-local
+source contract for replay. Changing source roles requires a fresh capture.
 
 The first mapping may be reviewed `skos:exactMatch` or `skos:closeMatch`. Capture
 uses only well-formed Wikidata entity IRIs and excludes `rdfs:seeAlso` discovery
@@ -72,7 +79,8 @@ documentation and attribution, extracts the registry entry, and adds registry
 query headers using the [documented query metadata](https://registry.okn.us/help/update-queries/).
 `bundle.json` records the source commit, dirty state and hashes of all bundle files.
 The bundle also carries cognitive's generated alignment review and queries for
-mapping evidence and concept-valued keywords. Semantic checks reject literal
+mapping evidence, concept-valued keywords and relation scopes, plus the entity
+model and keyword curation notes. Semantic checks reject literal
 keywords, undeclared local keyword concepts, custom citation predicates and
 SKOS mappings without complete source/rationale/date evidence.
 The check rejects changed, missing, extra or escaping files. An existing output
@@ -111,9 +119,11 @@ raise errors. Supported relations are the five SKOS mapping predicates.
 See the [primary-source review](semantic-review-2026-10-20.md) and cognitive's
 [vocabulary contract](https://github.com/ActiveInferenceInstitute/cognitive/blob/main/docs/okn/vocabulary.md).
 
-Tags become named SKOS concepts with labels and original spellings.
-`model_fitting` and `computational_modeling` instead reuse STATO:0000218 and
-NCIT:C16461 as keyword objects. This does not assert that a publication is an
+Tags use the reviewed exact lookup in `src/daf_okn/core/keyword_terms.py`;
+unreviewed tags become local SKOS concepts with labels and original spellings.
+The shared curated registry preserves `model_fitting`/STATO:0000218 and
+`computational_modeling`/NCIT:C16461 and records additional reviewed terms.
+This does not assert that a publication is an
 instance of its subject. `cited_by`/`cites` reuse BIBO with the source direction.
 Explicit SIO predicates are supported; conceptual `implements` is not globally
 rewritten because SIO requires an information entity conforming to a specification.

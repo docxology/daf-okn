@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -17,9 +19,11 @@ from daf_okn.core.rdf import (
     default_namespace_base,
     graph_iri,
     graph_to_rdf,
+    graph_to_rdf_diagnostics,
     relation_predicate,
     relation_slug,
     shortname_slug,
+    validate_rdf_semantics,
 )
 
 # rdflib's own N-Quads / TriG / JSON-LD *parsers* still call deprecated rdflib APIs;
@@ -46,7 +50,6 @@ def _doc() -> GraphDocument:
                     "tags": ["inference", "maths"],
                     "authors": ["A. Author"],
                     "year": 2022,
-                    "doi": "10.1000/xyz 1",
                     "wikidata": "Q42",
                     "status": "stable",
                     "weight": 3,
@@ -55,6 +58,12 @@ def _doc() -> GraphDocument:
                 },
             ),
             NodeRecord(id="maths/blanket", title="Markov Blanket"),
+            NodeRecord(
+                id="citations/paper",
+                title="Paper",
+                node_type="citation",
+                attributes={"doi": "10.1000/xyz 1"},
+            ),
             NodeRecord(id="README", title="Readme", node_type="overview"),
             NodeRecord(id="old", title="Old", node_type="redirect"),
             NodeRecord(id="http://example.org/ext", title="External", node_type="uri"),
@@ -94,6 +103,10 @@ def _page(node_id: str) -> URIRef:
     return URIRef(f"{BASE}page/{node_id}")
 
 
+def _concept(node_id: str) -> URIRef:
+    return URIRef(f"{BASE}concept/{node_id}")
+
+
 def test_namespace_defaults_follow_frink_convention() -> None:
     assert default_namespace_base("My Graph!") == "https://purl.org/okn/frink/kg/my-graph/"
     assert str(graph_iri(BASE)) == "https://purl.org/okn/frink/kg/demo"
@@ -106,9 +119,14 @@ def test_nodes_use_standard_types_and_labels() -> None:
     graph = _graph()
     fe = _page("maths/free_energy")
     assert (fe, RDF.type, SCHEMA.CreativeWork) in graph
-    assert (fe, RDF.type, SKOS.Concept) in graph
-    assert (fe, SKOS.inScheme, URIRef(BASE + "scheme")) in graph
-    assert (fe, SKOS.prefLabel, Literal("Free Energy")) in graph
+    assert (fe, RDF.type, SKOS.Concept) not in graph
+    topic = _concept("maths/free_energy")
+    assert (topic, RDF.type, SKOS.Concept) in graph
+    assert (topic, RDF.type, SCHEMA.CreativeWork) not in graph
+    assert (fe, SCHEMA.about, topic) in graph
+    assert (fe, DCTERMS.subject, topic) in graph
+    assert (topic, SKOS.inScheme, URIRef(BASE + "scheme")) in graph
+    assert (topic, SKOS.prefLabel, Literal("Free Energy")) in graph
     assert (fe, DCTERMS.title, Literal("Free Energy")) in graph
     # Navigation pages are collection pages, not concepts; redirects are neither.
     readme = _page("README")
@@ -127,7 +145,10 @@ def test_node_fields_map_to_dcterms_skos_and_schema() -> None:
     graph = _graph()
     fe = _page("maths/free_energy")
     assert (fe, DCTERMS.description, Literal("A bound on surprise.")) in graph
-    assert {str(o) for o in graph.objects(fe, SKOS.altLabel)} == {"FE", "variational free energy"}
+    assert {str(o) for o in graph.objects(_concept("maths/free_energy"), SKOS.altLabel)} == {
+        "FE",
+        "variational free energy",
+    }
     assert (fe, DCTERMS.created, Literal("2024-01-02", datatype=XSD.date)) in graph
     assert (fe, DCTERMS.modified, Literal("2025-03-04", datatype=XSD.date)) in graph
     assert set(graph.objects(fe, SCHEMA.keywords)) == {
@@ -135,7 +156,11 @@ def test_node_fields_map_to_dcterms_skos_and_schema() -> None:
     }
     assert (fe, SCHEMA.author, Literal("A. Author")) in graph
     assert (fe, SCHEMA.datePublished, Literal("2022", datatype=XSD.gYear)) in graph
-    assert (fe, SCHEMA.sameAs, URIRef("https://doi.org/10.1000/xyz%201")) in graph
+    assert (
+        _page("citations/paper"),
+        SCHEMA.sameAs,
+        URIRef("https://doi.org/10.1000/xyz%201"),
+    ) in graph
     assert (fe, RDFS.seeAlso, URIRef("http://www.wikidata.org/entity/Q42")) in graph
     assert not list(graph.triples((fe, SKOS.closeMatch, None)))
     assert not list(graph.triples((fe, SKOS.exactMatch, None)))
@@ -172,7 +197,7 @@ def test_reviewed_mapping_has_reified_source_evidence() -> None:
         ],
     )
     graph = build_rdf_graph(doc, namespace_base=BASE)
-    page, target = _page("cortisol"), URIRef(mapping["target"])
+    page, target = _concept("cortisol"), URIRef(mapping["target"])
     assert (page, SKOS.exactMatch, target) in graph
     statement = next(graph.subjects(RDF.subject, page))
     assert (statement, RDF.predicate, SKOS.exactMatch) in graph
@@ -183,6 +208,41 @@ def test_reviewed_mapping_has_reified_source_evidence() -> None:
     doc.nodes[0].node_type = "index"
     with pytest.raises(ValueError, match="non-concept"):
         build_rdf_graph(doc)
+
+
+def test_multiple_reviewed_targets_stay_on_the_local_topic():
+    records = [
+        {
+            "target": "https://example.org/term/" + name,
+            "relation": "exactMatch",
+            "evidence": "https://example.org/definition/" + name,
+            "rationale": "Reviewed the local definition against target " + name,
+            "reviewed_on": "2026-10-23",
+        }
+        for name in ("one", "two")
+    ]
+    graph = build_rdf_graph(
+        GraphDocument(
+            "demo",
+            nodes=[
+                NodeRecord(
+                    "topic",
+                    "Topic",
+                    attributes={"external_mappings": records},
+                )
+            ],
+        ),
+        namespace_base=BASE,
+    )
+    topic = _concept("topic")
+    assert set(graph.objects(topic, SKOS.exactMatch)) == {URIRef(r["target"]) for r in records}
+    assert not list(graph.objects(_page("topic"), SKOS.exactMatch))
+    statements = list(graph.subjects(RDF.subject, topic))
+    assert len(statements) == 2
+    assert {str(o) for s in statements for o in graph.objects(s, DCTERMS.source)} == {
+        r["evidence"] for r in records
+    }
+    assert validate_rdf_semantics(graph, BASE) == []
 
 
 def test_keyword_iris_are_declared_and_preserve_exact_source_tag() -> None:
@@ -230,6 +290,30 @@ def test_reviewed_keyword_terms_are_reused_directly() -> None:
     assert not any(str(s).startswith(BASE + "keyword/") for s in graph.subjects())
 
 
+def test_keyword_reuse_preserves_exact_source_spellings():
+    doc = GraphDocument(
+        "demo",
+        nodes=[
+            NodeRecord(
+                "topic",
+                "Topic",
+                attributes={
+                    "tags": ["emotion", "genetics", "mathematics", " emotion ", "Emotion"],
+                },
+            )
+        ],
+    )
+    graph = build_rdf_graph(doc, namespace_base=BASE)
+    assert set(graph.objects(_page("topic"), SCHEMA.keywords)) == {
+        URIRef("http://purl.obolibrary.org/obo/NCIT_C54266"),
+        URIRef("http://purl.obolibrary.org/obo/NCIT_C16624"),
+        URIRef("http://purl.obolibrary.org/obo/NCIT_C16825"),
+        URIRef(BASE + "keyword/%20emotion%20"),
+        URIRef(BASE + "keyword/Emotion"),
+    }
+    assert (URIRef(BASE + "keyword/%20emotion%20"), SKOS.notation, Literal(" emotion ")) in graph
+
+
 def test_markdown_adapter_preserves_mapping_evidence_and_concept_scope(tmp_path: Path) -> None:
     (tmp_path / "cortisol.md").write_text(
         "---\ntitle: Cortisol\ndefinition: The cortisol chemical substance.\n"
@@ -241,14 +325,14 @@ def test_markdown_adapter_preserves_mapping_evidence_and_concept_scope(tmp_path:
         "    reviewed_on: 2026-10-20\n---\n"
     )
     document = build_cognitive_graph(tmp_path)
-    assert document.nodes[0].attributes["external_mappings"][0]["reviewed_on"] == "2026-10-20"
+    assert document.nodes[1].attributes["external_mappings"][0]["reviewed_on"] == "2026-10-20"
     graph = build_rdf_graph(document, namespace_base=BASE)
     assert (
-        _page("cortisol"),
+        _concept("cortisol"),
         SKOS.exactMatch,
         URIRef("http://purl.obolibrary.org/obo/CHEBI_17650"),
     ) in graph
-    assert (_page("cortisol"), SKOS.scopeNote, Literal("Excludes the HPA system.")) in graph
+    assert (_concept("cortisol"), SKOS.scopeNote, Literal("Excludes the HPA system.")) in graph
 
 
 def test_invalid_wikidata_id_falls_back_to_vocab() -> None:
@@ -264,17 +348,17 @@ def test_invalid_wikidata_id_falls_back_to_vocab() -> None:
 def test_relations_map_to_standard_terms_or_declared_subproperties() -> None:
     graph = _graph()
     fe, blanket, readme = (_page(x) for x in ("maths/free_energy", "maths/blanket", "README"))
-    assert (fe, SKOS.related, blanket) in graph
+    assert (_concept("maths/free_energy"), SKOS.related, _concept("maths/blanket")) in graph
     assert (fe, DCTERMS.isPartOf, readme) in graph
     assert (readme, DCTERMS.hasPart, fe) in graph
     assert (blanket, DCTERMS.references, fe) in graph  # wikilink origin
     assert (_page("old"), DCTERMS.isReplacedBy, fe) in graph
     implements = URIRef(BASE + "relation/implements")
-    connects = URIRef(BASE + "relation/connects_to")
-    assert (fe, implements, blanket) in graph
+    connects = URIRef(BASE + "relation/document/connects_to")
+    assert (_concept("maths/free_energy"), implements, _concept("maths/blanket")) in graph
     assert (fe, connects, URIRef("http://example.org/ext")) in graph
-    for term in (implements, connects, URIRef(BASE + "relation/label")):
-        assert (term, RDFS.subPropertyOf, SKOS.semanticRelation) in graph
+    for term in (implements, connects, URIRef(BASE + "relation/document/label")):
+        assert ((term, RDFS.subPropertyOf, SKOS.semanticRelation) in graph) == (term == implements)
         assert (term, RDF.type, RDF.Property) in graph
         assert any(graph.objects(term, RDFS.label))
     # Standard terms are never redeclared as custom relations.
@@ -298,7 +382,7 @@ def test_external_iris_are_kept_and_literal_nodes_become_literals() -> None:
     assert (external, RDF.type, SCHEMA.CreativeWork) not in graph
     assert (
         _page("maths/free_energy"),
-        URIRef(BASE + "relation/label"),
+        URIRef(BASE + "relation/document/label"),
         Literal("a label", lang="en"),
     ) in graph
     assert not list(graph.triples((_page("a label"), None, None)))
@@ -319,13 +403,17 @@ def test_dataset_domains_and_provenance_are_described() -> None:
     assert (URIRef(BASE + "scheme"), RDF.type, SKOS.ConceptScheme) in graph
     maths = URIRef(BASE + "domain/maths")
     assert (maths, RDF.type, SKOS.Collection) in graph
-    assert (maths, SKOS.member, _page("maths/free_energy")) in graph
+    assert (maths, SKOS.member, _concept("maths/free_energy")) in graph
 
 
 def test_language_tag_applies_to_human_readable_literals() -> None:
     graph = build_rdf_graph(_doc(), namespace_base=BASE, language="en")
     fe = _page("maths/free_energy")
-    assert (fe, SKOS.prefLabel, Literal("Free Energy", lang="en")) in graph
+    assert (
+        _concept("maths/free_energy"),
+        SKOS.prefLabel,
+        Literal("Free Energy", lang="en"),
+    ) in graph
     keyword = URIRef(BASE + "keyword/maths")
     assert (fe, SCHEMA.keywords, keyword) in graph
     assert (keyword, SKOS.prefLabel, Literal("maths", lang="en")) in graph
@@ -338,7 +426,7 @@ def test_nquads_round_trip_uses_named_graph_from_base(tmp_path: Path) -> None:
     dataset.parse(path, format="nquads")
     named = dataset.graph(URIRef("https://purl.org/okn/frink/kg/demo"))
     assert len(named) == len(build_rdf_graph(_doc(), namespace_base=BASE))
-    assert (_page("maths/free_energy"), RDF.type, SKOS.Concept) in named
+    assert (_concept("maths/free_energy"), RDF.type, SKOS.Concept) in named
     assert {str(g.identifier) for g in dataset.graphs() if len(g)} == {
         "https://purl.org/okn/frink/kg/demo"
     }
@@ -428,6 +516,56 @@ def test_unsupported_format_is_rejected_before_writing(tmp_path: Path) -> None:
     assert not (tmp_path / "g.xyz").exists()
 
 
+@pytest.mark.parametrize("endpoint", ["source", "target"])
+@rdflib_parser_warnings
+def test_diagnostic_rdf_preserves_dangling_edges_and_strict_rejection(
+    tmp_path: Path, endpoint: str
+) -> None:
+    """Diagnostic serialization returns actual errors; strict APIs retain their refusal."""
+    doc = GraphDocument(name="demo", nodes=[NodeRecord("known", "Known")])
+    source, target = ("missing", "known") if endpoint == "source" else ("known", "missing")
+    doc.edges.append(EdgeRecord(source, target, "connects_to"))
+    original = doc.to_dict()
+    strict_path = tmp_path / "strict.nq"
+    strict_path.write_text("preserve")
+    with pytest.raises(ValueError, match="page requires CreativeWork type: .*page/missing"):
+        build_rdf_graph(doc)
+    with pytest.raises(ValueError, match="page requires CreativeWork type: .*page/missing"):
+        graph_to_rdf(doc, strict_path)
+    assert strict_path.read_text() == "preserve"
+
+    diagnostic_path = tmp_path / "diagnostic.nq"
+    problems = graph_to_rdf_diagnostics(doc, diagnostic_path)
+
+    dataset = rdflib.Dataset()
+    dataset.parse(diagnostic_path, format="nquads")
+    graph = dataset.graph(graph_iri(BASE))
+    assert (_page(source), URIRef(BASE + "relation/document/connects_to"), _page(target)) in graph
+    assert not list(graph.triples((_page("missing"), RDF.type, None)))
+    assert problems == validate_rdf_semantics(graph, BASE)
+    assert f"page requires CreativeWork type: {_page('missing')}" in problems
+    assert doc.to_dict() == original
+
+
+@pytest.mark.parametrize("fmt", sorted(SUPPORTED_FORMATS))
+def test_diagnostic_rdf_matches_strict_serialization_for_valid_graph(
+    tmp_path: Path, fmt: str
+) -> None:
+    """Valid nearby data has identical triples and bytes under both APIs."""
+    strict = graph_to_rdf(_doc(), tmp_path / f"strict.{fmt}", fmt=fmt)
+    diagnostic = tmp_path / f"diagnostic.{fmt}"
+    assert graph_to_rdf_diagnostics(_doc(), diagnostic, fmt=fmt) == []
+    assert diagnostic.read_bytes() == strict.read_bytes()
+
+
+def test_diagnostic_rdf_rejects_unsupported_format_before_writes(tmp_path: Path) -> None:
+    """The diagnostic API cannot suppress construction/serialization failures."""
+    path = tmp_path / "new" / "graph.xyz"
+    with pytest.raises(ValueError, match="Unsupported RDF format: 'xyz'"):
+        graph_to_rdf_diagnostics(_doc(), path, fmt="xyz")
+    assert not path.parent.exists()
+
+
 @pytest.mark.parametrize(
     "fault", ["mapping_without_review", "external_mapping", "bad_iri", "bad_namespace"]
 )
@@ -505,7 +643,7 @@ def test_cognitive_fixture_vault_exports_expected_shapes(tmp_path: Path) -> None
     doc = build_cognitive_graph(FIXTURE_ROOT, collapse_redirects=False)
     base = default_namespace_base(doc.name)
     graph = build_rdf_graph(doc, namespace_base=base)
-    markov = URIRef(base + "page/mathematics/markov_blanket")
+    markov = URIRef(base + "concept/mathematics/markov_blanket")
     assert base == "https://purl.org/okn/frink/kg/cognitive-kb/"
     assert (markov, RDF.type, SKOS.Concept) in graph
     assert (markov, SKOS.prefLabel, Literal("Markov Blanket")) in graph
@@ -516,4 +654,176 @@ def test_cognitive_fixture_vault_exports_expected_shapes(tmp_path: Path) -> None
     custom = {p for _, p, _ in graph if str(p).startswith(base + "relation/")}
     assert custom
     for term in custom:
-        assert (term, RDFS.subPropertyOf, SKOS.semanticRelation) in graph
+        scope = (
+            SKOS.Concept
+            if not str(term).startswith(base + "relation/document/")
+            else SCHEMA.CreativeWork
+        )
+        assert (term, RDFS.domain, scope) in graph
+        assert (term, RDFS.range, scope) in graph
+
+
+@pytest.mark.parametrize(
+    "fault",
+    [
+        "dual_type",
+        "page_concept",
+        "page_mapping",
+        "page_relation",
+        "missing_about",
+        "missing_subject",
+        "wrong_subject",
+        "concept_source",
+        "concept_citation",
+        "undeclared_topic",
+        "document_keyword",
+        "concept_label_on_page",
+        "missing_scope",
+        "document_skos_scope",
+        "document_containment_on_topic",
+        "document_domain_member",
+        "indirect_document_skos_scope",
+        "empty_meaning",
+        "missing_concept_superproperty",
+    ],
+)
+def test_entity_model_rejects_conflation_and_wrong_scopes(fault):
+    graph = _graph()
+    page, topic, other = (
+        _page("maths/free_energy"),
+        _concept("maths/free_energy"),
+        _concept("maths/blanket"),
+    )
+    if fault == "dual_type":
+        graph.add((topic, RDF.type, SCHEMA.CreativeWork))
+    elif fault == "page_concept":
+        graph.add((page, RDF.type, SKOS.Concept))
+    elif fault == "page_mapping":
+        graph.add((page, SKOS.exactMatch, URIRef("https://example.org/topic")))
+    elif fault == "page_relation":
+        graph.add((page, SKOS.related, other))
+    elif fault == "missing_about":
+        graph.remove((page, SCHEMA.about, topic))
+    elif fault == "missing_subject":
+        graph.remove((page, DCTERMS.subject, topic))
+    elif fault == "wrong_subject":
+        graph.set((page, DCTERMS.subject, other))
+    elif fault == "concept_source":
+        graph.add((topic, DCTERMS.source, URIRef("https://example.org/page")))
+    elif fault == "concept_citation":
+        graph.add((topic, URIRef("http://purl.org/ontology/bibo/cites"), _page("citations/paper")))
+    elif fault == "undeclared_topic":
+        graph.remove((other, RDF.type, SKOS.Concept))
+    elif fault == "document_keyword":
+        graph.add((page, SCHEMA.keywords, _page("README")))
+    elif fault == "concept_label_on_page":
+        graph.add((page, SKOS.prefLabel, Literal("Conflated label")))
+    elif fault == "missing_scope":
+        graph.remove((URIRef(BASE + "relation/implements"), RDFS.domain, None))
+    elif fault == "document_containment_on_topic":
+        graph.add((topic, DCTERMS.isPartOf, _page("README")))
+    elif fault == "document_domain_member":
+        graph.add((URIRef(BASE + "domain/maths"), SKOS.member, page))
+    elif fault == "indirect_document_skos_scope":
+        bridge = URIRef(BASE + "bridge")
+        graph.add((URIRef(BASE + "relation/document/connects_to"), RDFS.subPropertyOf, bridge))
+        graph.add((bridge, RDFS.subPropertyOf, SKOS.semanticRelation))
+    elif fault == "empty_meaning":
+        graph.set((URIRef(BASE + "relation/implements"), RDFS.comment, Literal("  ")))
+    elif fault == "missing_concept_superproperty":
+        graph.remove((URIRef(BASE + "relation/implements"), RDFS.subPropertyOf, None))
+    else:
+        graph.add(
+            (
+                URIRef(BASE + "relation/document/connects_to"),
+                RDFS.subPropertyOf,
+                SKOS.semanticRelation,
+            )
+        )
+    assert validate_rdf_semantics(graph, BASE), fault
+
+
+def test_distinct_documents_topics_citations_and_navigation_are_accepted(tmp_path):
+    pages = {
+        "topic.md": (
+            "---\ntype: concept\ntitle: Topic\nsource: https://example.org/topic\n"
+            "tags: [unreviewed_exact_tag]\nsemantic_relations:\n- type: foundation_for\n"
+            "  links: ['[[other]]']\n- type: cites\n  links: ['[[citations/paper]]']\n"
+            "---\nBody bytes stay here.\n"
+        ),
+        "other.md": "---\ntype: mathematical_concept\n---\n",
+        "README.md": (
+            "---\ntype: overview\nsemantic_relations:\n- type: implements\n"
+            "  links: ['[[topic]]']\n---\n[[topic]]\n"
+        ),
+        "citations/paper.md": "---\ntype: citation\ndoi: 10.1000/example\n---\n",
+    }
+    for name, body in pages.items():
+        path = tmp_path / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(body)
+    document = build_cognitive_graph(tmp_path)
+    graph = build_rdf_graph(document, namespace_base=BASE)
+    assert validate_rdf_semantics(graph, BASE) == []
+    assert (_concept("topic"), URIRef(BASE + "relation/foundation_for"), _concept("other")) in graph
+    assert (
+        _page("topic"),
+        URIRef("http://purl.org/ontology/bibo/cites"),
+        _page("citations/paper"),
+    ) in graph
+    assert (_page("README"), URIRef(BASE + "relation/document/implements"), _page("topic")) in graph
+    assert not list(graph.triples((_concept("citations/paper"), None, None)))
+    assert (_page("topic"), DCTERMS.source, URIRef("https://example.org/topic")) in graph
+    assert not list(graph.triples((_concept("topic"), DCTERMS.source, None)))
+    for name, body in pages.items():
+        assert (tmp_path / name).read_bytes() == body.encode()
+
+
+def test_model_modules_import_without_runtime_file_or_network_io():
+    """Real audit hooks reject data reads, writes and sockets during imports."""
+    script = r"""
+import importlib
+import os
+import socket
+import sys
+import rdflib
+import requests
+import yaml
+import networkx
+sys.dont_write_bytecode = True
+rejected = []
+def guard(event, args):
+    if event.startswith("socket."):
+        rejected.append(event)
+        raise RuntimeError("unexpected socket I/O")
+    if event == "open":
+        path, mode, flags = args
+        if (
+            not isinstance(path, str)
+            or not path.endswith((".py", ".pyc", ".so"))
+            or flags & (os.O_WRONLY | os.O_RDWR | os.O_CREAT)
+        ):
+            rejected.append(event)
+            raise RuntimeError("unexpected runtime file I/O")
+sys.addaudithook(guard)
+for operation in (lambda: open("forbidden-import-data.txt"), socket.socket):
+    try:
+        operation()
+    except RuntimeError:
+        pass
+    else:
+        raise AssertionError("the rejecting control did not fail")
+assert len(rejected) == 2
+rejected.clear()
+for module in (
+    "daf_okn.core.alignment", "daf_okn.core.keyword_terms",
+    "daf_okn.core.cognitive_adapter", "daf_okn.core.rdf",
+    "daf_okn.core.rdf_submission", "daf_okn.analysis.cross_graph",
+):
+    importlib.import_module(module)
+assert not rejected, rejected
+print("no runtime file or network I/O")
+"""
+    result = subprocess.run([sys.executable, "-c", script], capture_output=True, text=True)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert result.stdout.strip() == "no runtime file or network I/O"

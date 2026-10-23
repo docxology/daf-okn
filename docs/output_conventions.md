@@ -119,7 +119,8 @@ To add a new figure or data product:
 ## Troubleshooting
 
 - **Missing file**: Identify which step should generate it and re-run that step.
-- **Stale file**: Delete `output/` and run the full sequence.
+- **Stale file**: Regenerate through its producer. Preserve dated captures,
+  bundles and validation receipts; write their replacements to fresh destinations.
 - **Out-of-sync tokens**: If `{{VARIABLE}}` appears in the rendered output, re-run step 4 (variable hydration) and verify `output/data/manuscript_variables.json` contains all required keys.
 - **Figure not appearing in rendered output**: Verify the PNG exists in `output/figures/` and that the manuscript references it with correct relative path (`../output/figures/filename.png`).
 

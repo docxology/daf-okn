@@ -1,6 +1,7 @@
 import json
 import threading
 from contextlib import contextmanager
+from dataclasses import asdict
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
@@ -11,9 +12,11 @@ from rdflib import Dataset, Literal, URIRef
 from daf_okn.analysis import cross_graph as join
 from daf_okn.cli import main as run_cli
 
-QUERY = Path(__file__).resolve().parents[2] / "tests/fixtures/cross_graph_obo.rq"
+QUERY = Path(__file__).resolve().parents[2] / "tests/fixtures/cross_graph_obo_v3.rq"
+LEGACY_QUERY = QUERY.with_name("cross_graph_obo.rq")
 WD = "http://www.wikidata.org/entity/Q190875"
 TERM = join.OBO + "CHEBI_17650"
+CONCEPT = join.GRAPH + "/concept/biology/cortisol"
 PAGE = join.GRAPH + "/page/biology/cortisol"
 
 
@@ -22,13 +25,16 @@ def local_export(tmp_path):
     graph = dataset.graph(URIRef(join.GRAPH))
     graph.add(
         (
-            URIRef(PAGE),
+            URIRef(CONCEPT),
             URIRef(join.PREFIXES["rdf"] + "type"),
             URIRef(join.PREFIXES["skos"] + "Concept"),
         )
     )
-    graph.add((URIRef(PAGE), URIRef(join.PREFIXES["skos"] + "prefLabel"), Literal("Cortisol")))
-    graph.add((URIRef(PAGE), URIRef(join.PREFIXES["skos"] + "closeMatch"), URIRef(WD)))
+    graph.add((URIRef(CONCEPT), URIRef(join.PREFIXES["skos"] + "prefLabel"), Literal("Cortisol")))
+    graph.add((URIRef(CONCEPT), URIRef(join.PREFIXES["skos"] + "closeMatch"), URIRef(WD)))
+    graph.add((URIRef(PAGE), URIRef(join.PREFIXES["rdf"] + "type"), join.SCHEMA.CreativeWork))
+    graph.add((URIRef(PAGE), join.SCHEMA.about, URIRef(CONCEPT)))
+    graph.add((URIRef(PAGE), URIRef(join.PREFIXES["dcterms"] + "subject"), URIRef(CONCEPT)))
     graph.add(
         (
             URIRef(PAGE),
@@ -78,8 +84,8 @@ def endpoint_server():
         server.server_close()
 
 
-def arguments(source, out):
-    return ["join", "--source", str(source), "--query", str(QUERY), "--output", str(out)]
+def arguments(source, out, query=QUERY):
+    return ["join", "--source", str(source), "--query", str(query), "--output", str(out)]
 
 
 def test_live_capture_and_offline_replay_match_real_query_results(tmp_path):
@@ -92,7 +98,9 @@ def test_live_capture_and_offline_replay_match_real_query_results(tmp_path):
     result = json.loads((replay / "join-results.json").read_text())
     assert result["matched_pages"] == result["joined_rows"] == result["external_terms"] == 1
     assert result["rows"][0]["external"] == TERM
-    assert result["rows"][0]["concept"] == PAGE
+    assert result["rows"][0]["concept"] == CONCEPT
+    assert result["rows"][0]["page"] == PAGE
+    assert json.loads((snapshot / "manifest.json").read_text())["schema_version"] == 3
     assert (snapshot / "join-results.json").read_bytes() == (
         replay / "join-results.json"
     ).read_bytes()
@@ -115,8 +123,8 @@ def test_exact_keys_work_and_other_external_terms_are_not_requested(tmp_path):
     dataset = Dataset().parse(source, format="nquads")
     graph = dataset.graph(URIRef(join.GRAPH))
     graph.remove((None, URIRef(join.PREFIXES["skos"] + "closeMatch"), None))
-    graph.add((URIRef(PAGE), URIRef(join.EXACT), URIRef(WD)))
-    graph.add((URIRef(PAGE), URIRef(join.EXACT), URIRef(TERM)))
+    graph.add((URIRef(CONCEPT), URIRef(join.EXACT), URIRef(WD)))
+    graph.add((URIRef(CONCEPT), URIRef(join.EXACT), URIRef(TERM)))
     graph.add(
         (
             URIRef(PAGE),
@@ -186,6 +194,15 @@ def test_source_without_named_graph_is_rejected(tmp_path):
 def test_query_builder_rejects_unsupported_graph():
     with pytest.raises(join.JoinError):
         join.query_for("https://example.org/graph", [WD])
+
+
+@pytest.mark.parametrize("version", [True, 3.0, "3", 0, 4])
+def test_result_schema_version_requires_an_exact_supported_integer(tmp_path, version):
+    with pytest.raises(join.JoinError, match="unsupported join result schema"):
+        join.write_results(
+            Dataset(), QUERY, (tmp_path / "out", "2026-10-23"), schema_version=version
+        )
+    assert not (tmp_path / "out").exists()
 
 
 @pytest.mark.parametrize(
@@ -331,34 +348,172 @@ def test_response_parser_rejects_malformed_or_oversized_documents(tmp_path, raw)
         join.response_triples(raw)
 
 
-def legacy_capture(snapshot, destination):
-    manifest = json.loads((snapshot / "manifest.json").read_text())
-    manifest.pop("schema_version")
-    manifest.pop("files")
-    (snapshot / "join-query.rq").rename(destination)
-    (snapshot / "manifest.json").write_text(json.dumps(manifest))
-    return manifest
-
-
-def test_original_capture_schema_remains_readable(tmp_path):
-    source = local_export(tmp_path)
+def historical_capture(tmp_path, version=1, extra_keys=()):
+    """Construct the original source/projection contract, preserving old RDF roles."""
+    dataset = Dataset()
+    graph = dataset.graph(URIRef(join.GRAPH))
+    rdf_type, skos = join.PREFIXES["rdf"] + "type", join.PREFIXES["skos"]
+    graph.add((URIRef(PAGE), URIRef(rdf_type), URIRef(skos + "Concept")))
+    graph.add((URIRef(PAGE), URIRef(skos + "prefLabel"), Literal("Cortisol")))
+    for key in (WD, *extra_keys):
+        graph.add((URIRef(PAGE), URIRef(skos + "closeMatch"), URIRef(key)))
+    graph.add(
+        (
+            URIRef(PAGE),
+            URIRef(join.PREFIXES["dcterms"] + "source"),
+            URIRef("https://example.org/cortisol"),
+        )
+    )
+    source = tmp_path / "legacy.nq"
+    dataset.serialize(source, format="nquads")
     snapshot = tmp_path / "capture"
+    snapshot.mkdir()
+    keys = join._wikidata_subjects(dataset)
     with endpoint_server() as endpoint:
-        assert run_cli(arguments(source, snapshot) + ["--endpoint", endpoint]) == 0
-    legacy_capture(snapshot, tmp_path / "preserved-query.rq")
+        captures = join.capture_stage(keys, join.MAPPINGS, (endpoint, snapshot))
+        join.add_captures(dataset, captures, snapshot)
+        external = sorted({str(o) for _, _, o in dataset.graph(URIRef(join.MAPPINGS))})
+        label_captures = join.capture_stage(external, join.UBERGRAPH, (endpoint, snapshot))
+        join.add_captures(dataset, label_captures, snapshot)
+        captures += label_captures
+    manifest = dict(
+        observed_at="2026-10-20T12:00:00+00:00",
+        endpoint=endpoint,
+        local_sha256=join.sha256(source),
+        join_query_sha256=join.sha256(LEGACY_QUERY),
+        captures=[asdict(c) for c in captures],
+        requested_wikidata_keys=len(keys),
+        requested_obo_terms=len(external),
+    )
+    join.write_results(
+        dataset,
+        LEGACY_QUERY,
+        (snapshot, manifest["observed_at"]),
+        provenance=join._provenance(manifest),
+        schema_version=version,
+    )
+    if version == 2:
+        (snapshot / "join-query.rq").write_bytes(LEGACY_QUERY.read_bytes())
+        manifest["schema_version"] = 2
+        manifest["files"] = {
+            name: join.sha256(snapshot / name) for name in sorted(join.file_inventory(snapshot))
+        }
+    (snapshot / "manifest.json").write_text(json.dumps(manifest))
+    return source, snapshot
+
+
+@pytest.mark.parametrize("version", [1, 2])
+def test_original_capture_schema_remains_readable(tmp_path, version):
+    source, snapshot = historical_capture(tmp_path, version)
     replay = tmp_path / "replay"
-    assert run_cli(arguments(source, replay) + ["--replay", str(snapshot)]) == 0
+    assert run_cli(arguments(source, replay, LEGACY_QUERY) + ["--replay", str(snapshot)]) == 0
     assert json.loads((replay / "join-results.json").read_text())["rows"][0]["concept"] == PAGE
+
+
+@pytest.mark.parametrize(
+    "fault", ["page_concept", "page_mapping", "concept_source", "missing_about", "missing_subject"]
+)
+def test_new_capture_rejects_conflated_or_unlinked_source_models(tmp_path, fault):
+    source = local_export(tmp_path)
+    dataset = Dataset().parse(source, format="nquads")
+    graph = dataset.graph(URIRef(join.GRAPH))
+    if fault == "page_concept":
+        graph.add(
+            (
+                URIRef(PAGE),
+                URIRef(join.PREFIXES["rdf"] + "type"),
+                URIRef(join.PREFIXES["skos"] + "Concept"),
+            )
+        )
+    elif fault == "page_mapping":
+        graph.remove((URIRef(CONCEPT), URIRef(join.EXACT), None))
+        graph.add((URIRef(PAGE), URIRef(join.EXACT), URIRef(WD)))
+    elif fault == "concept_source":
+        graph.add(
+            (
+                URIRef(CONCEPT),
+                URIRef(join.PREFIXES["dcterms"] + "source"),
+                URIRef("https://example.org/cortisol"),
+            )
+        )
+    else:
+        graph.remove(
+            (
+                URIRef(PAGE),
+                join.SCHEMA.about
+                if fault == "missing_about"
+                else URIRef(join.PREFIXES["dcterms"] + "subject"),
+                None,
+            )
+        )
+    dataset.serialize(source, format="nquads")
+    out = tmp_path / "rejected"
+    with endpoint_server() as endpoint:
+        assert run_cli(arguments(source, out) + ["--endpoint", endpoint]) == 1
+    assert not out.exists()
+
+
+def test_new_model_cannot_be_downgraded_to_historical_capture_schema(tmp_path):
+    source = local_export(tmp_path)
+    with pytest.raises(join.JoinError, match="historical capture schema"):
+        join.write_results(
+            join.local_dataset(source),
+            LEGACY_QUERY,
+            (tmp_path / "out", "2026-10-23"),
+            schema_version=2,
+        )
+
+
+@pytest.mark.parametrize("fault", ["page", "source"])
+def test_current_join_row_must_match_the_projected_document_source(tmp_path, fault):
+    source = local_export(tmp_path)
+    dataset = join.local_dataset(source)
+    dataset.graph(URIRef(join.MAPPINGS)).add((URIRef(WD), URIRef(join.EXACT), URIRef(TERM)))
+    dataset.graph(URIRef(join.UBERGRAPH)).add(
+        (URIRef(TERM), URIRef(join.LABEL), Literal("cortisol"))
+    )
+    other_page = join.GRAPH + "/page/unrelated"
+    graph = dataset.graph(URIRef(join.GRAPH))
+    graph.add((URIRef(other_page), URIRef(join.PREFIXES["rdf"] + "type"), join.SCHEMA.CreativeWork))
+    graph.add(
+        (
+            URIRef(other_page),
+            URIRef(join.PREFIXES["dcterms"] + "source"),
+            URIRef("https://example.org/cortisol"),
+        )
+    )
+    values = dict(
+        page=other_page if fault == "page" else PAGE,
+        concept=CONCEPT,
+        wikidata=WD,
+        external=TERM,
+        source="https://example.org/forged"
+        if fault == "source"
+        else "https://example.org/cortisol",
+    )
+    query = tmp_path / "swapped-document.rq"
+    query.write_text(
+        "SELECT "
+        + " ".join(f"(<{value}> AS ?{key})" for key, value in values.items())
+        + ' ("Cortisol" AS ?label) ("cortisol" AS ?externalLabel) WHERE {}'
+    )
+    with pytest.raises(join.JoinError, match="three named source graphs"):
+        join.write_results(dataset, query, (tmp_path / "out", "2026-10-23"))
 
 
 @pytest.mark.parametrize(
     "fault", ["results", "query", "metadata", "files", "schema", "missing_capture"]
 )
-def test_v2_capture_binds_results_join_query_and_manifest_metadata(tmp_path, fault):
-    source = local_export(tmp_path)
-    snapshot = tmp_path / "capture"
-    with endpoint_server() as endpoint:
-        assert run_cli(arguments(source, snapshot) + ["--endpoint", endpoint]) == 0
+@pytest.mark.parametrize("version", [2, 3])
+def test_versioned_capture_binds_results_join_query_and_manifest_metadata(tmp_path, fault, version):
+    query = LEGACY_QUERY if version == 2 else QUERY
+    if version == 2:
+        source, snapshot = historical_capture(tmp_path, 2)
+    else:
+        source = local_export(tmp_path)
+        snapshot = tmp_path / "capture"
+        with endpoint_server() as endpoint:
+            assert run_cli(arguments(source, snapshot) + ["--endpoint", endpoint]) == 0
     manifest = json.loads((snapshot / "manifest.json").read_text())
     if fault in {"results", "query"}:
         path = snapshot / ("join-results.json" if fault == "results" else "join-query.rq")
@@ -372,29 +527,24 @@ def test_v2_capture_binds_results_join_query_and_manifest_metadata(tmp_path, fau
     else:
         manifest["captures"].pop()
     (snapshot / "manifest.json").write_text(json.dumps(manifest))
-    assert run_cli(arguments(source, tmp_path / "replay") + ["--replay", str(snapshot)]) == 1
+    assert run_cli(arguments(source, tmp_path / "replay", query) + ["--replay", str(snapshot)]) == 1
 
 
 def test_legacy_replay_requires_even_empty_response_batches(tmp_path):
-    source = local_export(tmp_path)
-    dataset = Dataset().parse(source, format="nquads")
-    graph = dataset.graph(URIRef(join.GRAPH))
-    for number in range(1, 102):
-        graph.add(
-            (URIRef(PAGE), URIRef(join.EXACT), URIRef(f"http://www.wikidata.org/entity/Q{number}"))
-        )
-    dataset.serialize(source, format="nquads")
-    snapshot = tmp_path / "capture"
-    with endpoint_server() as endpoint:
-        assert run_cli(arguments(source, snapshot) + ["--endpoint", endpoint]) == 0
-    manifest = legacy_capture(snapshot, tmp_path / "preserved-query.rq")
+    source, snapshot = historical_capture(
+        tmp_path, extra_keys=[f"http://www.wikidata.org/entity/Q{n}" for n in range(1, 102)]
+    )
+    manifest = json.loads((snapshot / "manifest.json").read_text())
     assert manifest["requested_wikidata_keys"] == 102
     missing = manifest["captures"].pop(1)
     for field in ("query_file", "response_file"):
         path = snapshot / missing[field]
         path.rename(tmp_path / path.name)
     (snapshot / "manifest.json").write_text(json.dumps(manifest))
-    assert run_cli(arguments(source, tmp_path / "replay") + ["--replay", str(snapshot)]) == 1
+    assert (
+        run_cli(arguments(source, tmp_path / "replay", LEGACY_QUERY) + ["--replay", str(snapshot)])
+        == 1
+    )
 
 
 @pytest.mark.parametrize("subjects", [[], [WD, WD], [WD] * 101])
@@ -407,7 +557,8 @@ def test_query_cannot_present_constant_rows_as_a_successful_join(tmp_path):
     source = local_export(tmp_path)
     query = tmp_path / "forged-query.rq"
     values = {
-        "concept": PAGE,
+        "page": PAGE,
+        "concept": CONCEPT,
         "wikidata": WD,
         "external": TERM,
         "source": "https://example.org/cortisol",

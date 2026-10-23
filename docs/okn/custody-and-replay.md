@@ -51,6 +51,21 @@ These constraints do not add global OWL rules. The
 defines mapping properties; this project's review records document local
 source comparisons and do not prove that they are scientifically correct.
 
+The current [entity model](entity-model.md) also rejects page Concept typing,
+document mapping endpoints, semantic relations attached to documents, concept
+source/publication metadata, mismatched about/subject links, missing local types
+and custom predicates without explicit meanings and endpoint scopes. The bundle
+inventory includes cognitive's `entity-model.md`,
+`keyword-curation-2026-10-23.md` and `relation_scopes.rq`. Static imports bring
+`rdf_keywords.py` and `rdf_relations.py` into runtime custody automatically;
+omitting either imported source fails current-root verification.
+
+New joins use capture schema 3. Its seven projected variables are page, concept,
+label, wikidata, external, externalLabel and source; the source must belong to
+a projected CreativeWork document linked to the concept with both about and subject.
+Schemas 1 and 2 retain their historical concept-local source contract for
+replay, and cannot be used to downgrade a new document/concept source graph.
+
 HTTP IRI validation uses the shared parser in
 `src/daf_okn/core/alignment.py`. The export profile requires DNS/IP hosts,
 valid ports and percent escapes and excludes user information and encoded

@@ -25,12 +25,14 @@ from typing import Any
 
 import yaml
 
+from .cognitive_adapter import ENTITY_MODEL
 from .graph import GraphDocument
 from .rdf import (
     SUPPORTED_FORMATS,
     default_namespace_base,
     graph_iri,
     graph_to_rdf,
+    graph_to_rdf_diagnostics,
     shortname_slug,
 )
 from .rdf import _quote as _quote_iri_fragment
@@ -251,8 +253,18 @@ def _entry_from_metadata(doc: GraphDocument) -> dict[str, Any]:
 
 def _collect_iri_issues(doc: GraphDocument) -> list[str]:
     """Collect node and edge ids that would need percent-encoding in an IRI."""
+    topic_paths = {
+        node.id: node.id.removeprefix("concept:")
+        for node in doc.nodes
+        if doc.metadata.get("entity_model") == ENTITY_MODEL
+        and node.node_type == "topic_concept"
+        and node.attributes.get("entity_role") == "concept"
+        and node.id.startswith("concept:")
+        and node.id.removeprefix("concept:")
+    }
 
     def unsafe(identifier: str) -> bool:
+        identifier = topic_paths.get(identifier, identifier)
         # Absolute IRIs (e.g. nodes pulled from SPARQL) are used verbatim.
         return "://" not in identifier and _quote_iri_fragment(identifier) != identifier
 
@@ -287,7 +299,9 @@ def validate_package(doc: GraphDocument, out_dir: Path) -> list[str]:
     ``description``, ``homepage``, ``funding``, ``license``, ``source``, ``language``,
     ``body``, ``contacts``). Structural problems are included in the returned
     diagnostics. Invalid shortnames or destinations outside ``out_dir`` prevent
-    all writes; other diagnostics retain the inspectable draft package.
+    all writes; other diagnostics retain the inspectable draft package. RDF
+    semantic problems also fail validation and mark the registry/checklist as
+    diagnostic drafts. RDF construction errors still raise ``ValueError``.
     """
 
     problems = doc.validate()
@@ -354,15 +368,26 @@ def validate_package(doc: GraphDocument, out_dir: Path) -> list[str]:
 
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    graph_to_rdf(
-        doc,
-        graph_file,
-        fmt=fmt,
-        namespace_base=namespace_base,
-        named_graph=bool(doc.name),
-        entry=entry,
+    # WHY: malformed endpoints must remain inspectable without bypassing the
+    # RDF verdict or changing the strict standalone serializer's contract.
+    problems.extend(
+        graph_to_rdf_diagnostics(
+            doc,
+            graph_file,
+            fmt=fmt,
+            namespace_base=namespace_base,
+            named_graph=bool(doc.name),
+            entry=entry,
+        )
     )
 
+    diagnostic_notice = (
+        "## Diagnostic draft\n\nValidation failed. Do not upload or publish.\n\n"
+        + "\n".join(f"- {problem}" for problem in problems)
+        + "\n\n"
+        if problems
+        else ""
+    )
     registry_markdown = registry_entry(
         shortname=shortname,
         title=title,
@@ -370,13 +395,13 @@ def validate_package(doc: GraphDocument, out_dir: Path) -> list[str]:
         contacts=contacts,
         homepage=str(entry["homepage"]) if entry.get("homepage") else None,
         funding=str(entry["funding"]) if entry.get("funding") else None,
-        body=str(entry.get("body") or _default_body(entry, namespace_base)),
+        body=diagnostic_notice + str(entry.get("body") or _default_body(entry, namespace_base)),
     )
     entry_file.parent.mkdir(parents=True, exist_ok=True)
     entry_file.write_text(registry_markdown, encoding="utf-8")
 
     checklist_file.write_text(
-        "\n".join(f"- {item}" for item in contribution_checklist()) + "\n",
+        diagnostic_notice + "\n".join(f"- {item}" for item in contribution_checklist()) + "\n",
         encoding="utf-8",
     )
 

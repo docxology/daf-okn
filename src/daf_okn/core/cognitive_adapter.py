@@ -3,7 +3,8 @@ r"""Generic Obsidian-vault adapter, built for the Active Inference Institute
 ``cognitive`` knowledge base, producing the shared :mod:`daf_okn.core.graph` model.
 
 Any directory of markdown pages with YAML frontmatter and ``[[wiki links]]`` can
-be read: one page is one node, ``[[links]]`` are edges. The ``cognitive``
+be read: each page is a document node, ``[[links]]`` are document references,
+and declared topic-bearing pages have distinct concept nodes. The ``cognitive``
 knowledge base (https://github.com/ActiveInferenceInstitute/cognitive) is the
 reference case, and its ``semantic_relations`` frontmatter dialect (typed edges)
 is understood in addition to plain Obsidian links.
@@ -16,8 +17,10 @@ upstream repository; this module only reads a markdown vault.
 
 Dialect notes carried over verbatim from the source repository:
 
-* One markdown file is one node; the node id is the vault-relative POSIX
-  path without the ``.md`` suffix (e.g. ``mathematics/markov_blanket``).
+* Every file has a document node at its vault-relative POSIX path without
+  ``.md``. Declared topics add ``concept:<path>`` nodes; the document links to
+  its topic with schema:about and dcterms:subject. Untyped documents remain
+  documents unless they carry explicit reviewed topic mappings.
 * YAML frontmatter sits between leading ``---`` fences and carries ``title``,
   ``type``, ``status``, ``created``, ``updated``, ``tags`` and — on redirect
   nodes — ``redirect``. Wiki-linkish titles ``[[target|display]]`` are
@@ -79,6 +82,7 @@ __all__ = [
     "parse_frontmatter",
     "parse_semantic_relations",
     "vault_root",
+    "separate_document_topics",
 ]
 
 WIKI_LINK_PATTERN = re.compile(r"\[\[([^\]]+)\]\]")
@@ -146,6 +150,221 @@ PARENT_RELATION = "has_parent"
 REDIRECT_RELATION = "redirects_to"
 WIKILINK_RELATION = "related"
 GRAPH_NAME = "cognitive-kb"
+
+ENTITY_MODEL = "document-concept-v1"
+DOCUMENT_TYPES = frozenset(
+    {
+        "overview",
+        "index",
+        "redirect",
+        "citation_redirect",
+        "citation",
+        "agents",
+        "glossary",
+        "reference",
+        "guide",
+        "implementation",
+        "implementation_guide",
+        "documentation",
+        "catalog",
+        "resource",
+        "roadmap",
+        "verification",
+        "learning_path",
+        "agent_config",
+        "matrix_spec",
+        "example",
+        "visualization",
+        "meta",
+    }
+)
+TOPIC_TYPES = frozenset(
+    {
+        "concept",
+        "mathematical_concept",
+        "biological_concept",
+        "cognitive_concept",
+        "knowledge_base",
+        "biology",
+        "mathematics",
+        "philosophy",
+        "systems",
+        "system",
+        "ontology",
+        "article",
+        "application",
+        "integration",
+        "research",
+        "state_space",
+    }
+)
+CONCEPT_ATTRIBUTES = frozenset({"aliases", "definition", "scope_note", "external_mappings"})
+CONCEPT_RELATIONS = {
+    "implements": (
+        "Source method or design concept implements the target specification or theory concept; "
+        "no execution or real-world instance is asserted."
+    ),
+    "extends": "Source concept extends the target concept's formulation or scope.",
+    "foundation_for": "Source topic provides a conceptual foundation for the target topic.",
+    "foundational_for": "Source topic provides a conceptual foundation for the target topic.",
+    "foundation": "Source topic has the target topic as its conceptual foundation.",
+    "mathematical_basis": "Source topic has the target topic as its mathematical basis.",
+    "provides": (
+        "Source concept supplies a conceptual capability or component used by the target concept."
+    ),
+    "applies_to": "Source method or theory concept is described as applicable to the target topic.",
+    "foundational_to": "Source topic provides a conceptual foundation for the target topic.",
+    "underpins": "Source topic provides a conceptual basis for the target topic.",
+    "foundational_theory": "Source topic draws on the target foundational theory.",
+    "builds_on": "Source topic builds conceptually on the target topic.",
+    "grounded_in": "Source topic is conceptually grounded in the target topic.",
+    "implemented_by": (
+        "Source specification or theory concept is implemented conceptually by the target method "
+        "or design; no executable instance is asserted."
+    ),
+    "generalizes": "Source topic generalizes the target topic; no SKOS hierarchy is inferred.",
+    "specializes": "Source topic specializes the target topic; no SKOS hierarchy is inferred.",
+    "formalized_by": "Source topic uses the target topic as a formalization.",
+    "integrates": "Source topic integrates the target topic into its conceptual formulation.",
+    "influences": (
+        "Source author asserts that the source topic influences the target topic; "
+        "causation is not independently verified."
+    ),
+    "supports": "Source author asserts conceptual support from source topic to target topic.",
+    "specifies": "Source topic supplies a specification for the target topic.",
+    "uses": "Source topic uses the target method or conceptual resource.",
+    "used_by": "Source topic is used by the target method or conceptual resource.",
+    "applied_in": "Source topic is presented as applied in the target topic.",
+    "applications": "Source topic lists the target topic as an application.",
+    "examples": "Source topic lists the target topic as a conceptual example, not an OWL instance.",
+    "includes": "Source topic includes the target topic in its conceptual scope.",
+    "operates_on": "Source method concept operates on the target conceptual structure.",
+    "connects": "Source topic provides a conceptual connection to the target topic.",
+    "contrasts_with": "Source topic is contrasted with the target topic by the source author.",
+    "prerequisite_for": "Source topic is a conceptual prerequisite for the target topic.",
+    "prerequisite": "Source topic requires the target topic as a conceptual prerequisite.",
+    "emerges_from": (
+        "Source topic is described as emerging from the target topic; "
+        "no instance-level causation is asserted."
+    ),
+    "analyzes": "Source method concept analyzes the target topic.",
+    "part_of": "Source topic is a conceptual part of the target topic, not document containment.",
+    "component_of": (
+        "Source topic is a conceptual component of the target topic, not document containment."
+    ),
+}
+DOCUMENT_RELATION_MEANINGS = {
+    "documents": "Source document documents material presented in the target document.",
+    "documented_by": "Source document names the target document as its documentation.",
+    "documented_in": "Source document names the target document as its documentation location.",
+    "defines": "Source document lists the target document under its definitions.",
+    "guides": "Source document lists the target document as guidance material.",
+    "maps": "Source document cross-references the target document in a source-authored map.",
+    "aggregates": "Source document aggregates or indexes the target document.",
+    "explains": "Source document offers an explanation of material in the target document.",
+    "demonstrates": "Source document offers an example of material in the target document.",
+    "visualizes": "Source document offers a visualization of material in the target document.",
+}
+_RELATED_RELATIONS = frozenset({"relates", "related", "relates_to", "related_to"})
+_PART_RELATIONS = frozenset({"part_of", "component_of"})
+_DOCUMENT_RELATIONS = (
+    frozenset(
+        {
+            "organizes",
+            "has_parent",
+            "redirects_to",
+            "cites",
+            "cited_by",
+            "documents",
+        }
+    )
+    | DOCUMENT_RELATION_MEANINGS.keys()
+)
+
+
+def separate_document_topics(document: GraphDocument) -> GraphDocument:
+    """Separate vault documents and their topics without changing source records.
+
+    Page IDs retain their original spelling; topic IDs use ``concept:<page-id>``.
+    Unknown or mixed-scope assertions remain explicit document assertions and
+    are listed for curation. SPARQL-imported RDF retains its own term identities.
+    """
+    if (
+        document.metadata.get("source") == "sparql"
+        or document.metadata.get("entity_model") == ENTITY_MODEL
+    ):
+        return document
+    nodes: list[NodeRecord] = []
+    topics: dict[str, str] = {}
+    ids = {node.id for node in document.nodes}
+    for node in document.nodes:
+        if re.match(r"^(?:[A-Za-z][A-Za-z0-9+.-]*://|urn:|_:)", node.id) or node.node_type in {
+            "literal",
+            "bnode",
+            "uri",
+        }:
+            nodes.append(node)
+            continue
+        attrs = dict(node.attributes)
+        role = attrs.get("entity_role")
+        if role is not None:
+            raise ValueError(f"unversioned entity role on node {node.id!r}: {role!r}")
+        is_topic = (
+            node.node_type in TOPIC_TYPES
+            and "citations" not in node.id.split("/")[:-1]
+            and node.id.rsplit("/", 1)[-1].lower() not in {"readme", "agents", "catalog", "index"}
+        )
+        if attrs.get("external_mappings") and not is_topic:
+            raise ValueError(f"non-concept node {node.id!r} cannot carry SKOS mappings")
+        concept_attrs = (
+            {key: attrs.pop(key) for key in CONCEPT_ATTRIBUTES if key in attrs} if is_topic else {}
+        )
+        attrs["entity_role"] = "document"
+        nodes.append(NodeRecord(node.id, node.title, node.node_type, attrs))
+        if is_topic:
+            concept_id = "concept:" + node.id
+            if concept_id in ids:
+                raise ValueError(f"topic ID collides with a source node: {concept_id!r}")
+            topics[node.id] = concept_id
+            concept_attrs["entity_role"] = "concept"
+            nodes.append(NodeRecord(concept_id, node.title, "topic_concept", concept_attrs))
+    edges: list[EdgeRecord] = []
+    residual: list[dict[str, str]] = []
+    for page, topic in topics.items():
+        edges.extend(
+            EdgeRecord(page, topic, relation, "entity_model")
+            for relation in ("schema:about", "dcterms:subject")
+        )
+    for edge in document.edges:
+        source, target, relation = edge.source, edge.target, edge.relation
+        slug = re.sub(r"[^a-z0-9]+", "_", relation.strip().lower()).strip("_")
+        if edge.origin not in {"wikilink", "redirect"}:
+            conceptual = (
+                slug in _RELATED_RELATIONS | _PART_RELATIONS
+                or slug in CONCEPT_RELATIONS
+                or relation.startswith("skos:")
+                or relation.startswith("http://www.w3.org/2004/02/skos/core#")
+            )
+            if conceptual and source in topics and target in topics:
+                source, target = topics[source], topics[target]
+                if slug in _PART_RELATIONS:
+                    relation = "concept/" + slug
+            elif slug in DOCUMENT_RELATION_MEANINGS:
+                relation = "document/" + slug
+            elif slug not in _DOCUMENT_RELATIONS and slug not in _PART_RELATIONS:
+                residual.append({"source": source, "target": target, "relation": relation})
+                relation = "document/" + slug
+        edges.append(EdgeRecord(source, target, relation, edge.origin))
+    metadata = dict(document.metadata, entity_model=ENTITY_MODEL, document_assertions=residual)
+    counts = dict(
+        metadata.get("counts", {}),
+        nodes=len(nodes),
+        edges=len(edges),
+        documents=sum(n.attributes.get("entity_role") == "document" for n in nodes),
+        concepts=len(topics),
+    )
+    metadata["counts"] = counts
+    return GraphDocument(document.name, nodes, edges, metadata)
 
 
 def _normalise_key(value: str) -> str:
@@ -537,10 +756,12 @@ def _node_record_for(path: Path, root_dir: Path, frontmatter: dict[str, Any]) ->
     node_id = _node_id_for_path(root_dir, path)
     node_type = str(frontmatter.get("type") or "").strip()
     if not node_type:
-        node_type = DOCUMENT_NODE_TYPES.get(path.name.lower(), "concept")
+        node_type = DOCUMENT_NODE_TYPES.get(
+            path.name.lower(), "concept" if frontmatter.get("external_mappings") else "document"
+        )
 
     attributes: dict[str, Any] = {}
-    for key in ("status", "created", "updated"):
+    for key in ("status", "created", "updated", "modified", "processing_priority"):
         value = frontmatter.get(key)
         if value is not None:
             attributes[key] = _coerce_attribute_value(value)
@@ -563,6 +784,8 @@ def _node_record_for(path: Path, root_dir: Path, frontmatter: dict[str, Any]) ->
         "wikidata",
         "definition",
         "scope_note",
+        "source",
+        "license",
     ):
         value = frontmatter.get(key)
         if value is not None and str(value).strip():
@@ -590,7 +813,8 @@ def build_cognitive_graph(
     ``kb_root`` is the markdown vault root (for the ``cognitive`` repository,
     its ``knowledge_base/`` directory); ``name`` becomes the graph name
     (default ``cognitive-kb``). Every ``.md`` file becomes a node with
-    id = vault-relative POSIX path sans ``.md``. ``semantic_relations``
+    id = vault-relative POSIX path sans ``.md``. Topic records have distinct
+    ``concept:<path>`` IDs and explicit about/subject edges. ``semantic_relations``
     frontmatter edges use ``origin='explicit'``, body wiki-links use
     ``origin='wikilink'`` (untyped ``related`` relation), and redirect nodes
     emit ``redirects_to`` edges. With ``collapse_redirects=True`` redirect
@@ -601,7 +825,8 @@ def build_cognitive_graph(
     ``metadata['self_loop_edges']`` (counted in ``metadata['counts']``).
     Unresolvable targets are recorded under
     ``metadata['unresolved_targets']`` as ``{source, target, origin}``
-    entries rather than dropped.
+    entries rather than dropped. Unknown or mixed-role semantic assertions stay
+    document-valued and are listed in ``metadata['document_assertions']``.
     """
     root = Path(kb_root).resolve()
     if not root.is_dir():
@@ -724,7 +949,9 @@ def build_cognitive_graph(
         "self_loop_edges": sorted(self_loop_nodes),
         "vault_name": root.name,
     }
-    return GraphDocument(name=name, nodes=nodes, edges=edges, metadata=metadata)
+    return separate_document_topics(
+        GraphDocument(name=name, nodes=nodes, edges=edges, metadata=metadata)
+    )
 
 
 def vault_root(path: Path) -> Path:

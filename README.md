@@ -97,21 +97,28 @@ Following RENCI's guidance to reuse existing vocabularies, nodes and edges becom
 
 | In the graph document | In the RDF |
 | --- | --- |
-| node | `schema:CreativeWork`; also `skos:Concept` (with `skos:prefLabel`, `skos:inScheme`) unless it is an `overview`/`index` page (`schema:CollectionPage`) |
-| title, `description`, `aliases` | `dcterms:title`, `dcterms:description`, `skos:altLabel` |
-| `created`, `updated`, `tags` | `dcterms:created`, `dcterms:modified`, concept-valued `schema:keywords` |
-| `authors`, `year`, `doi`, `wikidata` | `schema:author`, `schema:datePublished`, `schema:sameAs`, discovery-only `rdfs:seeAlso` |
-| `definition`, `scope_note`, `external_mappings` | SKOS definition/scope note and explicit source-reviewed mappings with statement evidence |
-| relation `related` / `relates_to` | `skos:related` |
-| relation `part_of`, `organizes` | `dcterms:isPartOf`, `dcterms:hasPart` |
-| body `[[link]]` (origin `wikilink`) | `dcterms:references` |
-| `cited_by`, `cites` | `bibo:citedBy`, `bibo:cites`, preserving source direction |
-| any other relation, e.g. `implements` | `<base>relation/implements`, declared `rdfs:subPropertyOf skos:semanticRelation` with an `rdfs:label` |
-| any other node attribute | `<base>vocab/<key>` |
+| Markdown document | `schema:CreativeWork`; navigation records also use `schema:CollectionPage` |
+| Described topic | Separate `skos:Concept` with `skos:prefLabel` and `skos:inScheme`, linked from its document by `schema:about` and `dcterms:subject` |
+| Document title and description | `dcterms:title`, `dcterms:description` |
+| Topic aliases, `definition`, `scope_note` | `skos:altLabel`, `skos:definition`, `skos:scopeNote` on the concept |
+| `created`, `updated`, `tags` | Document dates and concept-valued `schema:keywords`, reusing reviewed external terms |
+| `authors`, `year`, `doi`, `wikidata` | Document `schema:author`, `schema:datePublished`, `schema:sameAs`, discovery-only `rdfs:seeAlso` |
+| `external_mappings` | Source-reviewed SKOS mappings from the concept, with statement evidence |
+| Conceptual `related` / `relates_to` | `skos:related` between topic concepts |
+| Part and navigation relations | Role-aware conceptual or document containment; see the entity model |
+| Body `[[link]]` (origin `wikilink`) | Document `dcterms:references` |
+| `cited_by`, `cites` | Document `bibo:citedBy`, `bibo:cites`, preserving source direction |
+| Reviewed conceptual custom predicates | Explicitly defined concept-to-concept relationships, including the scope of `foundation_for` and `implements` |
+| Unknown or document-scoped typed assertions | Separate document predicates without a SKOS super-property; retained for further review |
+| Other document attributes | `<base>vocab/<key>` |
 
-Entity IRIs are `https://purl.org/okn/frink/kg/<shortname>/page/<node id>`; the graph also
+Document IRIs use `https://purl.org/okn/frink/kg/<shortname>/page/<path>` and topic
+IRIs use the distinct `concept/<path>` namespace. The graph also
 carries a `dcat:Dataset` / `void:Dataset` description and a small PROV-O activity. Output has no
 timestamps, so the same input always yields the same bytes.
+
+The [entity model](docs/okn/entity-model.md) documents eligibility, identifier
+migration, relation direction and endpoint roles. A page is not typed as its topic.
 
 The [semantic export profile](docs/okn/cross-graph.md#semantic-export-profile)
 documents mapping validation, direct STATO/NCI keyword reuse and the boundary
@@ -142,9 +149,10 @@ daf-okn package --graph cognitive_kg.json --out-dir package --preset cognitive-k
 ## Vault adapter
 
 `daf_okn.core.cognitive_adapter` is a generic Obsidian-vault adapter that was built for the
-`cognitive` knowledge base. One markdown file is one node (id = path without `.md`); YAML
-frontmatter supplies title, type and other fields; `semantic_relations` entries become typed
-edges and body `[[wiki links]]` become untyped ones (code blocks and numeric matrix literals are
+`cognitive` knowledge base. Markdown files produce document records and, for eligible
+topic-bearing pages, separate topic records. YAML frontmatter supplies titles, types
+and other fields; `semantic_relations` entries are routed according to their endpoint
+roles and body `[[wiki links]]` become document references (code blocks and numeric matrix literals are
 ignored). A link resolves relative to the page, then the vault root, then by file name, then by
 frontmatter `aliases:`; names claimed by several pages always resolve to the alphabetically
 first path. Links that resolve nowhere are listed in the graph's `metadata.unresolved_targets`
@@ -159,6 +167,7 @@ rather than dropped.
 | `core/registry.py` | `OKNRegistry`: `kgs.yaml`, per-graph and federation SPARQL, TPF, VoID, embeddings search. |
 | `core/invariants.py` | `validate_graph`, `graph_stats`. |
 | `core/cognitive_adapter.py` | Markdown vault to `GraphDocument`. |
+| `core/keyword_terms.py` | Reviewed external subject terms, exact source-tag lookup and provenance validation. |
 | `core/rdf.py` | `GraphDocument` to RDF with standard vocabularies (`graph_to_rdf`, `build_rdf_graph`). |
 | `core/contribute.py` | Registry entry, checklist, upload commands, contribution package. |
 | `core/manuscript_variables.py`, `core/documentation.py`, `core/project_paths.py` | Support for the research manuscript and generated API reference. |

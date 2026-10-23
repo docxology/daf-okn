@@ -21,6 +21,7 @@ _DOCUMENTED_MODULES: tuple[str, ...] = (
     "daf_okn.core.registry",
     "daf_okn.core.invariants",
     "daf_okn.core.cognitive_adapter",
+    "daf_okn.core.keyword_terms",
     "daf_okn.core.rdf",
     "daf_okn.core.rdf_submission",
     "daf_okn.core.join_report",

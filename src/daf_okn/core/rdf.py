@@ -6,10 +6,10 @@ graph ``https://purl.org/okn/frink/kg/<shortname>``. This module follows that, a
 produces the same shapes as the reference exporter in the Active Inference Institute
 ``cognitive`` repository (``code/scripts/export_rdf.py``):
 
-* every non-literal node is a ``schema:CreativeWork``; nodes whose type is
-  ``overview`` or ``index`` are also ``schema:CollectionPage``, redirect nodes are nothing
-  more, every other node is a ``skos:Concept`` in one ``skos:ConceptScheme`` with a
-  ``skos:prefLabel``;
+* vault pages retain ``/page/<path>`` CreativeWork document IRIs; topic-bearing
+  pages link to distinct ``/concept/<path>`` SKOS concepts using both
+  ``schema:about`` and ``dcterms:subject``. Citation, navigation, redirect and
+  editorial records retain their document roles;
 * node fields map to ``dcterms:title``, ``dcterms:description``, ``skos:altLabel``,
   ``dcterms:created``, ``dcterms:modified``, ``schema:keywords``, ``schema:author``,
   ``schema:datePublished``, ``schema:sameAs`` (DOI) and ``rdfs:seeAlso`` (unreviewed Wikidata);
@@ -17,8 +17,9 @@ produces the same shapes as the reference exporter in the Active Inference Insti
 * edge relations map to ``skos:related``, ``dcterms:isPartOf``, ``dcterms:hasPart``,
   ``dcterms:references`` (body wiki links), BIBO citation predicates and
   ``dcterms:isReplacedBy`` (redirects);
-  any other relation name becomes a term under ``<base>relation/`` that is declared an
-  ``rdfs:subPropertyOf skos:semanticRelation`` with an ``rdfs:label``;
+  reviewed conceptual relations have explicit direction, meaning and Concept
+  domain/range. Unknown or mixed-role assertions use ``relation/document/``
+  document predicates without a SKOS super-property;
 * all other node attributes stay available as ``<base>vocab/<key>`` properties;
 * a ``dcat:Dataset`` / ``void:Dataset`` description and a small PROV-O activity describe
   the graph itself.
@@ -42,7 +43,15 @@ from rdflib import BNode, Graph, Literal, Namespace, URIRef
 from rdflib.namespace import DCAT, DCTERMS, PROV, RDF, RDFS, SKOS, VOID, XSD
 
 from .alignment import RELATIONS, checked_iri, reviewed_mappings
+from .cognitive_adapter import (
+    CONCEPT_RELATIONS,
+    DOCUMENT_RELATION_MEANINGS,
+    TOPIC_TYPES,
+    separate_document_topics,
+)
 from .graph import EdgeRecord, GraphDocument, NodeRecord
+from .keyword_terms import KEYWORD_TERMS as KEYWORD_TERMS
+from .keyword_terms import keyword_iri
 
 __all__ = [
     "KG_BASE",
@@ -51,10 +60,12 @@ __all__ = [
     "default_namespace_base",
     "graph_iri",
     "graph_to_rdf",
+    "graph_to_rdf_diagnostics",
     "relation_predicate",
     "relation_slug",
     "shortname_slug",
     "validate_rdf_semantics",
+    "validate_entity_model",
 ]
 
 KG_BASE = "https://purl.org/okn/frink/kg/"
@@ -62,10 +73,6 @@ TOOL_URL = "https://github.com/docxology/daf-okn"
 
 SCHEMA = Namespace("https://schema.org/")
 BIBO = Namespace("http://purl.org/ontology/bibo/")
-KEYWORD_TERMS = {
-    "model_fitting": "http://purl.obolibrary.org/obo/STATO_0000218",
-    "computational_modeling": "http://purl.obolibrary.org/obo/NCIT_C16461",
-}
 
 SUPPORTED_FORMATS = {
     "nt": "nt",
@@ -119,6 +126,8 @@ _MAPPED_ATTRIBUTES = frozenset(
         "external_mappings",
         "definition",
         "scope_note",
+        "source",
+        "license",
     }
 )
 _NAVIGATION_TYPES = frozenset({"overview", "index"})
@@ -167,6 +176,10 @@ def relation_predicate(relation: str, namespace_base: str) -> URIRef:
     become ``<base>relation/<slug>``.
     """
     text = relation.strip()
+    if text.startswith("document/"):
+        return URIRef(f"{_ensure_base(namespace_base)}relation/document/{relation_slug(text[9:])}")
+    if text.startswith("concept/"):
+        return URIRef(f"{_ensure_base(namespace_base)}relation/{relation_slug(text[8:])}")
     prefix, sep, local = text.partition(":")
     if sep and prefix in _PREFIXES and local and not local.startswith("//"):
         return URIRef(str(_PREFIXES[prefix]) + local)
@@ -188,6 +201,8 @@ def _node_iri(namespace_base: str, node_id: str) -> URIRef | BNode:
         return BNode(node_id[2:])
     if _is_external(node_id):
         return URIRef(node_id)
+    if node_id.startswith("concept:"):
+        return URIRef(f"{_ensure_base(namespace_base)}concept/{_quote(node_id[8:])}")
     return URIRef(f"{_ensure_base(namespace_base)}page/{_quote(node_id)}")
 
 
@@ -236,14 +251,14 @@ def _describe_node(
 
     if external or node.node_type == "bnode":
         graph.add((subject, RDFS.label, _lit(title, language)))
+    elif attributes.get("entity_role") == "concept":
+        graph.add((subject, RDF.type, SKOS.Concept))
+        graph.add((subject, SKOS.inScheme, URIRef(base + "scheme")))
+        graph.add((subject, SKOS.prefLabel, _lit(title, language)))
     else:
         graph.add((subject, RDF.type, SCHEMA.CreativeWork))
         if node.node_type in _NAVIGATION_TYPES:
             graph.add((subject, RDF.type, SCHEMA.CollectionPage))
-        elif node.node_type != "redirect":
-            graph.add((subject, RDF.type, SKOS.Concept))
-            graph.add((subject, SKOS.inScheme, URIRef(base + "scheme")))
-            graph.add((subject, SKOS.prefLabel, _lit(title, language)))
         graph.add((subject, DCTERMS.title, _lit(title, language)))
         graph.add((subject, URIRef(base + "vocab/pageType"), Literal(node.node_type)))
         used_terms.add("pageType")
@@ -251,12 +266,23 @@ def _describe_node(
     description = _text(attributes.get("description", ""))
     if description:
         graph.add((subject, DCTERMS.description, _lit(description, language)))
+    for key, predicate in (("source", DCTERMS.source), ("license", DCTERMS.license)):
+        if attributes.get(key):
+            graph.add((subject, predicate, URIRef(checked_iri(_text(attributes[key])))))
     for key, predicate in (("definition", SKOS.definition), ("scope_note", SKOS.scopeNote)):
         if attributes.get(key):
+            if attributes.get("entity_role") == "document":
+                name = "sourceDefinition" if key == "definition" else "sourceScopeNote"
+                predicate = URIRef(base + "vocab/" + name)
+                used_terms.add(name)
             graph.add((subject, predicate, _lit(_text(attributes[key]), language)))
     for alias in _scalars(attributes.get("aliases")):
         if _text(alias):
-            graph.add((subject, SKOS.altLabel, _lit(_text(alias), language)))
+            predicate = SKOS.altLabel
+            if attributes.get("entity_role") == "document":
+                predicate = URIRef(base + "vocab/sourceAlias")
+                used_terms.add("sourceAlias")
+            graph.add((subject, predicate, _lit(_text(alias), language)))
     if attributes.get("created") is not None:
         graph.add((subject, DCTERMS.created, _typed_date(attributes["created"])))
     updated = attributes.get("updated") or attributes.get("modified")
@@ -265,9 +291,10 @@ def _describe_node(
         modified.append(_text(updated))
     for tag in _scalars(attributes.get("tags")):
         if _text(tag):
-            label = _text(tag)
-            if label in KEYWORD_TERMS:
-                graph.add((subject, SCHEMA.keywords, URIRef(KEYWORD_TERMS[label])))
+            label = str(tag)
+            external_keyword = keyword_iri(label)
+            if external_keyword is not None:
+                graph.add((subject, SCHEMA.keywords, URIRef(external_keyword)))
                 continue
             keyword = URIRef(base + "keyword/" + quote(label, safe="-._~"))
             graph.add((subject, SCHEMA.keywords, keyword))
@@ -295,7 +322,7 @@ def _describe_node(
         graph.add((subject, RDFS.seeAlso, URIRef("http://www.wikidata.org/entity/" + qid)))
 
     mappings = reviewed_mappings(attributes.get("external_mappings"))
-    if mappings and node.node_type in {*_NAVIGATION_TYPES, "redirect"}:
+    if mappings and attributes.get("entity_role") != "concept":
         raise ValueError(f"non-concept node {node.id!r} cannot carry SKOS mappings")
     for mapping in mappings:
         predicate, target = URIRef(str(SKOS) + mapping.relation), URIRef(mapping.target)
@@ -314,6 +341,8 @@ def _describe_node(
             graph.add((statement, p, o))
 
     for key in sorted(attributes):
+        if key == "entity_role":
+            continue
         if key in _MAPPED_ATTRIBUTES and not (key == "wikidata" and qid and not wikidata_ok):
             continue
         key_slug = _quote(key)
@@ -343,15 +372,26 @@ def _declare_vocabulary(
     for slug in sorted(relations):
         term = URIRef(f"{base}relation/{slug}")
         graph.add((term, RDF.type, RDF.Property))
-        graph.add((term, RDFS.subPropertyOf, SKOS.semanticRelation))
+        conceptual = slug in CONCEPT_RELATIONS
+        if conceptual:
+            graph.add((term, RDFS.subPropertyOf, SKOS.semanticRelation))
+        scope = SKOS.Concept if conceptual else SCHEMA.CreativeWork
+        graph.add((term, RDFS.domain, scope))
+        graph.add((term, RDFS.range, scope))
         graph.add((term, RDFS.label, _lit(slug.replace("_", " "), language)))
         graph.add(
             (
                 term,
                 RDFS.comment,
                 _lit(
-                    f"Relation '{slug}' as written in the source graph; read it from the "
-                    "subject node to the object node.",
+                    CONCEPT_RELATIONS[slug]
+                    if conceptual
+                    else DOCUMENT_RELATION_MEANINGS.get(
+                        slug.removeprefix("document/"),
+                        f"Document assertion '{slug.removeprefix('document/')}' "
+                        "from source document to target document; preserves a source link "
+                        "for curation, without asserting a relation between topic concepts.",
+                    ),
                     language,
                 ),
             )
@@ -440,7 +480,29 @@ def build_rdf_graph(
             ``homepage``, ``source``, ``language``) used for the dataset description.
         language: Language tag for human-readable literals (default: ``entry["language"]``
             if present, else untagged).
+
+    Raises:
+        ValueError: Source records or the resulting RDF violate the export profile.
     """
+    base = _ensure_base(namespace_base or default_namespace_base(doc.name))
+    graph = _build_rdf_graph(doc, namespace_base=base, entry=entry, language=language)
+    errors = validate_rdf_semantics(
+        graph, base, entity_model=doc.metadata.get("source") != "sparql"
+    )
+    if errors:
+        raise ValueError("; ".join(errors))
+    return graph
+
+
+def _build_rdf_graph(
+    doc: GraphDocument,
+    *,
+    namespace_base: str,
+    entry: dict[str, Any] | None,
+    language: str | None,
+) -> Graph:
+    """Assemble export triples without interpreting their validation verdict."""
+    doc = separate_document_topics(doc)
     entry = dict(entry or {})
     base = _ensure_base(namespace_base or default_namespace_base(doc.name))
     language = language or (str(entry["language"]) if entry.get("language") else None)
@@ -469,8 +531,8 @@ def build_rdf_graph(
         _describe_node(
             graph, base, node, language=language, used_terms=used_terms, modified=modified
         )
-        if not _is_external(node.id) and "/" in node.id:
-            top = node.id.split("/", 1)[0]
+        if node.attributes.get("entity_role") == "concept" and "/" in node.id:
+            top = node.id.removeprefix("concept:").split("/", 1)[0]
             domains.add(top)
             graph.add(
                 (URIRef(f"{base}domain/{_quote(top)}"), SKOS.member, _node_iri(base, node.id))
@@ -497,20 +559,180 @@ def build_rdf_graph(
 
     _declare_vocabulary(graph, base, used_relations, used_terms, language)
     _describe_dataset(graph, base, doc, entry, modified, domains, language)
-    errors = validate_rdf_semantics(graph, base)
-    if errors:
-        raise ValueError("; ".join(errors))
     return graph
 
 
-def validate_rdf_semantics(graph: Graph, namespace_base: str) -> list[str]:
+def validate_entity_model(graph: Graph, namespace_base: str) -> list[str]:
+    """Check explicit document/topic roles and local predicate endpoint scopes.
+
+    External mapping and keyword targets need not be redeclared locally. Local
+    pages and topics must be typed, and a topic's sources are documents linked
+    with both about and subject. This is a bounded RDF profile, not OWL reasoning.
+    """
+    base = _ensure_base(namespace_base)
+    errors: list[str] = []
+    resources = {term for s, _, o in graph for term in (s, o) if isinstance(term, URIRef)}
+    pages = {term for term in resources if str(term).startswith(base + "page/")}
+    topics = {term for term in resources if str(term).startswith(base + "concept/")}
+    concepts = set(graph.subjects(RDF.type, SKOS.Concept))
+    documents = set(graph.subjects(RDF.type, SCHEMA.CreativeWork))
+    for resource in concepts & documents | concepts & pages:
+        errors.append(f"document/concept conflation: {resource}")
+    for concept in concepts:
+        if str(concept).startswith(base) and not str(concept).startswith(
+            (base + "concept/", base + "keyword/")
+        ):
+            errors.append(f"local concept must use a concept or keyword IRI: {concept}")
+    for page in pages - documents:
+        errors.append(f"page requires CreativeWork type: {page}")
+    for page in pages:
+        if any(
+            p in {SKOS.prefLabel, SKOS.altLabel, SKOS.definition, SKOS.scopeNote, SKOS.inScheme}
+            for p in graph.predicates(page)
+        ):
+            errors.append(f"concept labels or scope attached to document: {page}")
+    for topic in topics:
+        if topic not in concepts or not any(
+            isinstance(v, Literal) and str(v).strip() for v in graph.objects(topic, SKOS.prefLabel)
+        ):
+            errors.append(f"topic requires Concept type and prefLabel: {topic}")
+        about = set(graph.subjects(SCHEMA.about, topic))
+        subject_documents = set(graph.subjects(DCTERMS.subject, topic))
+        if not about or about != subject_documents or not about <= documents:
+            errors.append(f"topic requires matching document about/subject links: {topic}")
+    for topic_predicate in (SCHEMA.about, DCTERMS.subject):
+        for document, candidate_topic in graph.subject_objects(topic_predicate):
+            if (
+                document not in documents
+                or not isinstance(candidate_topic, URIRef)
+                or candidate_topic in documents
+                or (str(candidate_topic).startswith(base) and candidate_topic not in concepts)
+            ):
+                errors.append(
+                    "about/subject endpoints require a document and concept: "
+                    f"{document} {candidate_topic}"
+                )
+        for page in pages:
+            about = set(graph.objects(page, SCHEMA.about))
+            subject_topics = set(graph.objects(page, DCTERMS.subject))
+            page_types = {str(t) for t in graph.objects(page, URIRef(base + "vocab/pageType"))}
+            parts = str(page)[len(base + "page/") :].split("/")
+            if about != subject_topics or (
+                page_types & TOPIC_TYPES
+                and not about
+                and "citations" not in parts[:-1]
+                and parts[-1].lower() not in {"readme", "agents", "catalog", "index"}
+            ):
+                errors.append(f"page requires matching about/subject links for its topic: {page}")
+    document_predicates = {
+        DCTERMS.title,
+        DCTERMS.description,
+        DCTERMS.created,
+        DCTERMS.modified,
+        DCTERMS.source,
+        DCTERMS.license,
+        DCTERMS.references,
+        DCTERMS.isReplacedBy,
+        SCHEMA.author,
+        SCHEMA.datePublished,
+        SCHEMA.sameAs,
+        SCHEMA.keywords,
+        BIBO.cites,
+        BIBO.citedBy,
+    }
+    for concept in concepts:
+        if any(
+            p in document_predicates or str(p).startswith(base + "vocab/")
+            for p in graph.predicates(concept)
+        ):
+            errors.append(f"document metadata or citations attached to concept: {concept}")
+    mapping_predicates = {URIRef(str(SKOS) + relation) for relation in RELATIONS}
+    semantic_predicates = {
+        SKOS.related,
+        SKOS.broader,
+        SKOS.narrower,
+        SKOS.semanticRelation,
+        SKOS.broaderTransitive,
+        SKOS.narrowerTransitive,
+    }
+    while True:
+        inherited = {
+            child
+            for child, parent in graph.subject_objects(RDFS.subPropertyOf)
+            if isinstance(child, URIRef) and parent in semantic_predicates
+        }
+        if inherited <= semantic_predicates:
+            break
+        semantic_predicates.update(inherited)
+    for subject, predicate, target in graph:
+        if (
+            predicate == SKOS.member
+            and str(subject).startswith(base + "domain/")
+            and target not in concepts
+        ):
+            errors.append(f"domain membership requires a concept: {target}")
+        if predicate in mapping_predicates and (
+            subject not in concepts
+            or subject in pages
+            or target in documents
+            or str(target).startswith(base + "page/")
+        ):
+            errors.append(f"mapping cannot use document endpoints: {subject} {target}")
+        if predicate in semantic_predicates - mapping_predicates and (
+            subject not in concepts or target not in concepts or subject in pages or target in pages
+        ):
+            errors.append(
+                "conceptual relation requires typed concept endpoints: "
+                f"{subject} {predicate} {target}"
+            )
+        if str(predicate).startswith(base + "relation/"):
+            conceptual = (
+                not str(predicate).startswith(base + "relation/document/")
+                and str(predicate)[len(base + "relation/") :] in CONCEPT_RELATIONS
+            )
+            scope = SKOS.Concept if conceptual else SCHEMA.CreativeWork
+            if (
+                set(graph.objects(predicate, RDFS.domain)) != {scope}
+                or set(graph.objects(predicate, RDFS.range)) != {scope}
+                or (predicate, RDF.type, RDF.Property) not in graph
+                or not any(
+                    isinstance(v, Literal) and str(v).strip()
+                    for v in graph.objects(predicate, RDFS.comment)
+                )
+                or (conceptual and predicate not in semantic_predicates)
+            ):
+                errors.append(f"custom relation lacks explicit meaning/domain/range: {predicate}")
+            if not conceptual and predicate in semantic_predicates:
+                errors.append(f"document relation cannot be a SKOS semantic relation: {predicate}")
+            endpoints = concepts if conceptual else documents
+            if any(str(t).startswith(base) and t not in endpoints for t in (subject, target)):
+                errors.append(
+                    f"custom relation has wrong endpoint scope: {subject} {predicate} {target}"
+                )
+        if predicate in {
+            BIBO.cites,
+            BIBO.citedBy,
+            DCTERMS.references,
+            DCTERMS.isReplacedBy,
+            DCTERMS.hasPart,
+            DCTERMS.isPartOf,
+        } and any(str(t).startswith(base) and t not in documents for t in (subject, target)):
+            errors.append(
+                f"document relation requires document endpoints: {subject} {predicate} {target}"
+            )
+    return sorted(set(errors))
+
+
+def validate_rdf_semantics(
+    graph: Graph, namespace_base: str, *, entity_model: bool = True
+) -> list[str]:
     """Check this export profile's mapping evidence and concept-valued keywords.
 
     These are explicit local custody constraints, not global OWL reasoning or
     independent confirmation that a reviewed correspondence is scientifically true.
     """
     base = _ensure_base(namespace_base)
-    errors: list[str] = []
+    errors: list[str] = validate_entity_model(graph, base) if entity_model else []
     iris = {term for triple in graph for term in triple if isinstance(term, URIRef)}
     iris.update(
         term.datatype
@@ -537,6 +759,14 @@ def validate_rdf_semantics(graph: Graph, namespace_base: str) -> list[str]:
             not isinstance(subject, URIRef)
             or not isinstance(target, URIRef)
             or (subject, RDF.type, SKOS.Concept) not in graph
+            or (
+                entity_model
+                and any(
+                    str(endpoint).startswith(base + "page/")
+                    or (endpoint, RDF.type, SCHEMA.CreativeWork) in graph
+                    for endpoint in (subject, target)
+                )
+            )
             or subject == target
             or (str(target).startswith(base) and (target, RDF.type, SKOS.Concept) not in graph)
         ):
@@ -689,6 +919,15 @@ def _serialize(graph: Graph, fmt: str, base: str, named_graph: bool) -> str:
     return graph.serialize(format=SUPPORTED_FORMATS[fmt])
 
 
+def _write_rdf(graph: Graph, path: Path, fmt: str, base: str, named_graph: bool) -> Path:
+    """Write assembled triples without adding, removing or repairing assertions."""
+    payload = _serialize(graph, fmt, base, named_graph and fmt in _QUAD_FORMATS)
+    destination = Path(path)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.write_text(payload, encoding="utf-8")
+    return destination
+
+
 def graph_to_rdf(
     doc: GraphDocument,
     path: Path,
@@ -707,14 +946,56 @@ def graph_to_rdf(
     ``named_graph`` is true. See the module docstring for the vocabulary mapping.
 
     Raises:
-        ValueError: ``fmt`` is not one of :data:`SUPPORTED_FORMATS`.
+        ValueError: ``fmt`` is unsupported, source records are invalid, or the
+            resulting RDF violates the export profile. No file is written.
     """
     if fmt not in SUPPORTED_FORMATS:
         raise ValueError(f"Unsupported RDF format: {fmt!r}")
     base = _ensure_base(namespace_base or default_namespace_base(doc.name))
     graph = build_rdf_graph(doc, namespace_base=base, entry=entry, language=language)
-    payload = _serialize(graph, fmt, base, named_graph and fmt in _QUAD_FORMATS)
-    destination = Path(path)
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    destination.write_text(payload, encoding="utf-8")
-    return destination
+    return _write_rdf(graph, path, fmt, base, named_graph)
+
+
+def graph_to_rdf_diagnostics(
+    doc: GraphDocument,
+    path: Path,
+    *,
+    fmt: str = "nq",
+    namespace_base: str | None = None,
+    named_graph: bool = True,
+    entry: dict[str, Any] | None = None,
+    language: str | None = None,
+) -> list[str]:
+    """Write inspectable draft RDF and return its semantic validation problems.
+
+    Uses the same triples and validators as :func:`graph_to_rdf`, retaining
+    invalid assertions for diagnosis instead of raising on the RDF verdict.
+    Callers must combine the returned problems with structural and package
+    checks; a written file is not evidence of a publishable package.
+
+    Args:
+        doc: Source graph document; it is not repaired or modified.
+        path: Destination for diagnostic RDF.
+        fmt: A format in :data:`SUPPORTED_FORMATS`.
+        namespace_base: Entity-IRI base, defaulting to the graph name's base.
+        named_graph: Use the named graph in quad formats when true.
+        entry: Optional registry-entry inputs for the dataset description.
+        language: Language tag for human-readable literals.
+
+    Returns:
+        Semantic errors, empty only when the RDF passes the export profile.
+        This does not replace ``doc.validate()`` or registry-entry checks.
+
+    Raises:
+        ValueError: The format or source records prevent RDF construction.
+            Construction and serialization errors propagate without suppression.
+    """
+    if fmt not in SUPPORTED_FORMATS:
+        raise ValueError(f"Unsupported RDF format: {fmt!r}")
+    base = _ensure_base(namespace_base or default_namespace_base(doc.name))
+    graph = _build_rdf_graph(doc, namespace_base=base, entry=entry, language=language)
+    problems = validate_rdf_semantics(
+        graph, base, entity_model=doc.metadata.get("source") != "sparql"
+    )
+    _write_rdf(graph, path, fmt, base, named_graph)
+    return problems

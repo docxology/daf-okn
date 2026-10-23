@@ -27,6 +27,14 @@ results; retain earlier source-bound outputs as historical artifacts. The
 generic page-oriented RDF exporter does not promise a verbatim round-trip of
 the source RDF dataset or named graphs.
 
+The Markdown adapter uses the [document/concept model](entity-model.md): source
+documents and topics are separate nodes connected by about/subject edges.
+Body references and citations count as document edges; semantic topic relations
+count as concept edges. Total node and edge counts include both roles and the
+model links. Compare measurements only when their model/projection contracts
+agree. SPARQL imports retain their RDF identities and do not receive invented
+CreativeWork or topic roles.
+
 ## Choose a projection explicitly
 
 `GraphDocument.to_multidigraph()` preserves every directed edge record,

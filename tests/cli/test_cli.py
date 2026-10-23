@@ -150,7 +150,27 @@ def test_export_writes_graph_json_from_a_vault(tmp_path: Path, capsys) -> None:
     assert "graph: cognitive\n" in printed  # plain vault: named after its directory
     assert "vault: cognitive" in printed
     document = GraphDocument.load_json(out)
-    assert len(document.nodes) == 11
+    pages = {node.id for node in document.nodes if node.attributes.get("entity_role") == "document"}
+    topics = {node.id for node in document.nodes if node.attributes.get("entity_role") == "concept"}
+    assert len(pages) == 11
+    assert topics == {
+        "concept:cognitive/pattern_separation",
+        "concept:mathematics/bayesian_networks",
+        "concept:mathematics/free_energy_principle",
+        "concept:mathematics/markov_blanket",
+        "concept:relative_links/nested_page",
+        "concept:spaced_folder/social_ecological_systems",
+    }
+    assert {node.id for node in document.nodes} == pages | topics
+    assert pages.isdisjoint(topics)
+    for topic in topics:
+        owner = topic.removeprefix("concept:")
+        assert owner in pages
+        assert {
+            edge.relation
+            for edge in document.edges
+            if edge.source == owner and edge.target == topic
+        } == {"schema:about", "dcterms:subject"}
     assert document.validate() == []
 
 
@@ -182,7 +202,11 @@ def test_export_accepts_name_and_options(tmp_path: Path) -> None:
     assert code == 0
     document = GraphDocument.load_json(out)
     assert document.name == "my-notes"
-    assert {edge.origin for edge in document.edges} <= {"explicit", "redirect"}
+    assert {edge.origin for edge in document.edges} <= {"explicit", "redirect", "entity_model"}
+    assert {edge.relation for edge in document.edges if edge.origin == "entity_model"} == {
+        "schema:about",
+        "dcterms:subject",
+    }
     assert any(node.node_type == "redirect" for node in document.nodes)
 
 

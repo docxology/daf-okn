@@ -9,6 +9,7 @@ from rdflib.namespace import DCTERMS, RDF, SKOS, XSD
 
 from daf_okn.cli import main
 from daf_okn.core import rdf_submission as submission
+from daf_okn.core.rdf import SCHEMA
 
 
 @pytest.mark.parametrize("payload", [b"", b"x" * (2 * 1024 * 1024 + 9)])
@@ -16,6 +17,7 @@ def test_streaming_file_hash_matches_independent_sha256(tmp_path, payload):
     path = tmp_path / "payload.bin"
     path.write_bytes(payload)
     assert submission.sha256(path) == hashlib.sha256(payload).hexdigest()
+
 
 GRAPH = "https://purl.org/okn/frink/kg/cognitive-kb"
 LICENSE = "https://creativecommons.org/licenses/by/4.0/"
@@ -50,6 +52,8 @@ def source_repo(tmp_path):
         "interoperability.md",
         "landing_zone.md",
         "alignment-review.md",
+        "entity-model.md",
+        "keyword-curation-2026-10-23.md",
     ):
         (docs / name).write_text("Documentation\n")
     (root / "LICENSE-KNOWLEDGE-BASE.md").write_text(LICENSE)
@@ -75,6 +79,8 @@ def source_repo(tmp_path):
         "cross_graph_obo.rq",
         "mapping_evidence.rq",
         "keyword_concepts.rq",
+        "relation_scopes.rq",
+        "document_topics.rq",
     ):
         (queries / name).write_text("SELECT ?s WHERE { ?s ?p ?o }\n")
     export = root / "output/okn"
@@ -84,6 +90,7 @@ def source_repo(tmp_path):
     graph.add((URIRef(GRAPH + "/dataset"), DCTERMS.license, URIRef(LICENSE)))
     graph.add((URIRef(GRAPH + "/scheme"), DCTERMS.license, URIRef(LICENSE)))
     graph.add((URIRef(GRAPH + "/page/example"), DCTERMS.title, Literal("Example")))
+    graph.add((URIRef(GRAPH + "/page/example"), RDF.type, SCHEMA.CreativeWork))
     dataset.serialize(export / "cognitive-kb.nq", format="nquads")
     graph.serialize(export / "cognitive-kb.ttl", format="turtle")
     refresh_manifest(export)
@@ -123,6 +130,15 @@ def refresh_manifest(export):
     (export / "manifest.json").write_text(json.dumps(manifest))
 
 
+def add_topic(graph):
+    page, topic = URIRef(GRAPH + "/page/example"), URIRef(GRAPH + "/concept/example")
+    graph.add((topic, RDF.type, SKOS.Concept))
+    graph.add((topic, SKOS.prefLabel, Literal("Example")))
+    graph.add((page, SCHEMA.about, topic))
+    graph.add((page, DCTERMS.subject, topic))
+    return topic
+
+
 def test_bundle_preserves_canonical_graph_and_verifies_actual_files(tmp_path):
     root = source_repo(tmp_path)
     out = tmp_path / "bundle"
@@ -131,7 +147,10 @@ def test_bundle_preserves_canonical_graph_and_verifies_actual_files(tmp_path):
         root / "output/okn/cognitive-kb.nq"
     ).read_bytes()
     assert (out / "registry/docs/registry/kgs/cognitive-kb.md").is_file()
-    assert len(list((out / "registry/docs/registry/queries/cognitive-kb").glob("*.rq"))) == 5
+    query_directory = out / "registry/docs/registry/queries/cognitive-kb"
+    assert {path.name for path in query_directory.glob("*.rq")} == set(submission.QUERY_FILES)
+    assert "document_topics.rq" in submission.QUERY_FILES
+    assert "#+ summary:" in (query_directory / "document_topics.rq").read_text()
     query = out / "registry/docs/registry/queries/cognitive-kb/cross_graph_obo.rq"
     assert "#+ tags:\n#+   - federation\n\n" in query.read_text()
     assert main(["bundle-rdf", "--output", str(out), "--check"]) == 0
@@ -252,12 +271,12 @@ def test_bundle_rejects_semantic_regressions_even_with_valid_hashes(tmp_path, fa
     page, target, statement = (
         URIRef(value)
         for value in (
-            GRAPH + "/page/example",
+            GRAPH + "/concept/example",
             "https://example.org/external",
             GRAPH + "/mapping/review",
         )
     )
-    graph.add((page, RDF.type, SKOS.Concept))
+    assert page == add_topic(graph)
     graph.add((page, SKOS.exactMatch, target))
     for p, o in (
         (RDF.type, RDF.Statement),
@@ -404,7 +423,7 @@ def test_review_evidence_must_describe_only_consistent_asserted_mappings(tmp_pat
     export = root / "output/okn"
     dataset = Dataset().parse(export / "cognitive-kb.nq", format="nquads")
     graph = dataset.graph(URIRef(GRAPH))
-    page, target = URIRef(GRAPH + "/page/example"), URIRef("https://example.org/concept")
+    page, target = add_topic(graph), URIRef("https://example.org/concept")
     if fault == "self":
         target = page
     elif fault == "local_target":
@@ -474,6 +493,81 @@ def test_transitive_exporter_runtime_imports_must_be_recorded(tmp_path):
         manifest["sources"][name] = submission.sha256(root / name)
     (export / "manifest.json").write_text(json.dumps(manifest))
     assert submission.validate_export(export, root) == []
+
+
+def test_new_keyword_and_relation_modules_are_in_runtime_source_closure(tmp_path):
+    root = source_repo(tmp_path)
+    scripts = root / "code/scripts"
+    (scripts / "export_rdf.py").write_text(
+        "import rdf_alignment\nfrom rdf_keywords import keyword_iri\n"
+    )
+    (scripts / "rdf_alignment.py").write_text(
+        "from scripts.rdf_relations import CONCEPT_RELATIONS\n"
+    )
+    (scripts / "rdf_keywords.py").write_text(
+        "KEYWORD_TERMS = {}\ndef keyword_iri(tag):\n    return KEYWORD_TERMS.get(tag)\n"
+    )
+    (scripts / "rdf_relations.py").write_text("CONCEPT_RELATIONS = {}\n")
+    expected = {
+        "code/scripts/" + name
+        for name in ("export_rdf.py", "rdf_alignment.py", "rdf_keywords.py", "rdf_relations.py")
+    }
+    assert submission.runtime_sources(root) == expected
+    export = root / "output/okn"
+    refresh_manifest(export)
+    errors = submission.validate_export(export, root)
+    assert any("rdf_keywords.py" in error and "rdf_relations.py" in error for error in errors)
+    manifest = json.loads((export / "manifest.json").read_text())
+    for name in expected:
+        manifest["sources"][name] = submission.sha256(root / name)
+    (export / "manifest.json").write_text(json.dumps(manifest))
+    assert submission.validate_export(export, root) == []
+    (scripts / "rdf_keywords.py").write_text(
+        "KEYWORD_TERMS = {'changed': 'https://example.org/term'}\n"
+    )
+    assert any(
+        "source hash mismatch: code/scripts/rdf_keywords.py" in error
+        for error in submission.validate_export(export, root)
+    )
+
+
+@pytest.mark.parametrize(
+    "fault",
+    [None, "page_concept", "page_mapping", "page_relation", "concept_source", "missing_about"],
+)
+def test_bundle_model_validation_survives_rehashed_semantic_tampering(tmp_path, fault):
+    root = source_repo(tmp_path)
+    export = root / "output/okn"
+    dataset = Dataset().parse(export / "cognitive-kb.nq", format="nquads")
+    graph = dataset.graph(URIRef(GRAPH))
+    topic, page = add_topic(graph), URIRef(GRAPH + "/page/example")
+    target = URIRef("https://example.org/external")
+    subject = page if fault == "page_mapping" else topic
+    graph.add((subject, SKOS.exactMatch, target))
+    statement = URIRef(GRAPH + "/mapping/review")
+    for predicate, value in (
+        (RDF.type, RDF.Statement),
+        (RDF.subject, subject),
+        (RDF.predicate, SKOS.exactMatch),
+        (RDF.object, target),
+        (DCTERMS.source, URIRef("https://example.org/evidence")),
+        (DCTERMS.description, Literal("Compared definitions.")),
+        (DCTERMS.date, Literal("2026-10-23", datatype=XSD.date)),
+    ):
+        graph.add((statement, predicate, value))
+    if fault in {"page_concept", "page_mapping"}:
+        graph.add((page, RDF.type, SKOS.Concept))
+    elif fault == "page_relation":
+        graph.add((page, SKOS.related, topic))
+    elif fault == "concept_source":
+        graph.add((topic, DCTERMS.source, URIRef("https://example.org/page")))
+    elif fault == "missing_about":
+        graph.remove((page, SCHEMA.about, topic))
+    dataset.serialize(export / "cognitive-kb.nq", format="nquads")
+    graph.serialize(export / "cognitive-kb.ttl", format="turtle")
+    refresh_manifest(export)
+    errors = submission.validate_export(export, root)
+    assert bool(errors) == (fault is not None)
 
 
 def test_runtime_inventory_covers_local_packages_and_relative_imports(tmp_path):

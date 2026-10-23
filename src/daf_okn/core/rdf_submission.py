@@ -33,6 +33,8 @@ DOCUMENT_FILES = (
     "docs/okn/interoperability.md",
     "docs/okn/landing_zone.md",
     "docs/okn/alignment-review.md",
+    "docs/okn/entity-model.md",
+    "docs/okn/keyword-curation-2026-10-23.md",
 )
 QUERY_FILES = (
     "concept_mappings.rq",
@@ -40,6 +42,8 @@ QUERY_FILES = (
     "keyword_concepts.rq",
     "citation_identifiers.rq",
     "cross_graph_obo.rq",
+    "relation_scopes.rq",
+    "document_topics.rq",
 )
 QUERY_DIRECTORY = "registry/docs/registry/queries/cognitive-kb"
 BUNDLE_FILES = (
@@ -301,6 +305,16 @@ def prepare(root: Path, output: Path) -> None:
             "cross_graph_obo.rq",
             "Cognitive concepts linked through Wikidata mappings to OBO ontology labels",
             ["federation"],
+        ),
+        (
+            "relation_scopes.rq",
+            "Document and concept relation meanings, directions and endpoint scopes",
+            ["cognitive-kb"],
+        ),
+        (
+            "document_topics.rq",
+            "Markdown documents and their separately identified topic concepts",
+            ["cognitive-kb"],
         ),
     ):
         header = f"#+ summary: {json.dumps(summary)}\n#+ tags:\n"
