@@ -625,13 +625,15 @@ def validate_entity_model(graph: Graph, namespace_base: str) -> list[str]:
     for page in pages:
         about = set(graph.objects(page, SCHEMA.about))
         subject_topics = set(graph.objects(page, DCTERMS.subject))
-        page_types = {str(t) for t in graph.objects(page, URIRef(base + "vocab/pageType"))}
+        raw_page_types = set(graph.objects(page, URIRef(base + "vocab/pageType")))
+        page_types = {str(t) for t in raw_page_types if isinstance(t, Literal)}
         suffix = str(page)[len(base + "page/") :]
         # WHY: decode only to inspect source-path roles. Ownership compares exact
         # RDF terms, so percent-encoded aliases never become interchangeable IRIs.
         parts = unquote(suffix).split("/")
         document_only = (
-            bool(page_types - TOPIC_TYPES)
+            any(not isinstance(t, Literal) for t in raw_page_types)
+            or bool(page_types - TOPIC_TYPES)
             or "citations" in parts[:-1]
             or parts[-1].lower() in {"readme", "agents", "catalog", "index"}
             or (page, RDF.type, SCHEMA.CollectionPage) in graph

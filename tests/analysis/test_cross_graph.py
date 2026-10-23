@@ -7,7 +7,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 import pytest
-from rdflib import Dataset, Literal, URIRef
+from rdflib import BNode, Dataset, Literal, URIRef
 from rdflib.namespace import DCTERMS, RDF, SKOS
 
 from daf_okn.analysis import cross_graph as join
@@ -526,6 +526,42 @@ def test_schema3_admission_and_results_reject_forged_document_topic_pairs(tmp_pa
     with pytest.raises(join.JoinError, match="document|topic"):
         join.write_results(dataset, QUERY, (rejected, "2026-10-23"))
     assert not rejected.exists()
+
+
+@pytest.mark.parametrize(
+    "source_types,allowed",
+    [
+        ([BNode("concept")], False),
+        ([BNode("renamed")], False),
+        ([URIRef("https://example.org/concept")], False),
+        ([Literal("concept"), BNode("concept")], False),
+        ([Literal("concept")], True),
+        ([], True),
+    ],
+)
+def test_schema3_direct_results_check_page_type_terms_before_writing(
+    tmp_path, source_types, allowed
+):
+    """Keep blank-node labels intact through the direct public generation boundary."""
+    dataset = join.local_dataset(local_export(tmp_path))
+    graph = dataset.graph(URIRef(join.GRAPH))
+    for term in source_types:
+        graph.add((URIRef(PAGE), URIRef(join.GRAPH + "/vocab/pageType"), term))
+    dataset.graph(URIRef(join.MAPPINGS)).add((URIRef(WD), URIRef(join.EXACT), URIRef(TERM)))
+    dataset.graph(URIRef(join.UBERGRAPH)).add(
+        (URIRef(TERM), URIRef(join.LABEL), Literal("cortisol"))
+    )
+    output = tmp_path / "direct"
+    if allowed:
+        join.write_results(dataset, QUERY, (output, "2026-10-23"))
+        rows = json.loads((output / "join-results.json").read_text())["rows"]
+        assert len(rows) == 1
+        assert rows[0]["page"] == PAGE
+        assert rows[0]["source"] == "https://example.org/cortisol"
+    else:
+        with pytest.raises(join.JoinError, match="document-only page"):
+            join.write_results(dataset, QUERY, (output, "2026-10-23"))
+        assert not output.exists()
 
 
 @pytest.mark.parametrize("fault", ["page", "source"])

@@ -9,7 +9,8 @@ from urllib.parse import quote
 
 import pytest
 import rdflib
-from rdflib import Literal, URIRef
+from rdflib import BNode, Literal, URIRef
+from rdflib.compare import isomorphic
 from rdflib.namespace import DCTERMS, RDF, RDFS, SKOS, XSD
 
 from daf_okn.core.cognitive_adapter import DOCUMENT_TYPES, build_cognitive_graph
@@ -24,6 +25,7 @@ from daf_okn.core.rdf import (
     relation_predicate,
     relation_slug,
     shortname_slug,
+    validate_entity_model,
     validate_rdf_semantics,
 )
 
@@ -869,6 +871,55 @@ def test_conflicting_source_types_cannot_override_a_document_only_role():
     graph = _graph()
     graph.add((_page("maths/free_energy"), URIRef(BASE + "vocab/pageType"), Literal("guide")))
     assert any("document-only page" in e for e in validate_rdf_semantics(graph, BASE))
+
+
+@pytest.mark.parametrize(
+    "source_types",
+    [
+        [BNode("concept")],
+        [BNode("renamed")],
+        [URIRef("https://example.org/concept")],
+        [Literal("concept"), BNode("concept")],
+    ],
+)
+def test_nonliteral_page_types_cannot_establish_a_topic_role(source_types):
+    graph = rdflib.Graph()
+    page, topic = _page("biology/topic"), _concept("biology/topic")
+    graph.add((page, RDF.type, SCHEMA.CreativeWork))
+    for term in source_types:
+        graph.add((page, URIRef(BASE + "vocab/pageType"), term))
+    # Nonliteral metadata on a document without a topic stays outside this rule.
+    assert validate_entity_model(graph, BASE) == []
+    assert validate_rdf_semantics(graph, BASE) == []
+    for triple in (
+        (page, SCHEMA.about, topic),
+        (page, DCTERMS.subject, topic),
+        (topic, RDF.type, SKOS.Concept),
+        (topic, SKOS.prefLabel, Literal("Topic")),
+        (topic, SKOS.inScheme, URIRef(BASE + "scheme")),
+    ):
+        graph.add(triple)
+    for validator in (validate_entity_model, validate_rdf_semantics):
+        assert any("document-only page" in error for error in validator(graph, BASE))
+    assert validate_rdf_semantics(graph, BASE, entity_model=False) == []
+    graph.remove((page, URIRef(BASE + "vocab/pageType"), None))
+    graph.add((page, URIRef(BASE + "vocab/pageType"), Literal("concept")))
+    assert validate_entity_model(graph, BASE) == []
+    assert validate_rdf_semantics(graph, BASE) == []
+
+
+def test_page_type_blank_node_alpha_renaming_preserves_rejection():
+    graph = _graph()
+    page = _page("maths/free_energy")
+    graph.set((page, URIRef(BASE + "vocab/pageType"), BNode("concept")))
+    renamed = rdflib.Graph()
+    for triple in graph:
+        renamed.add(tuple(BNode("renamed") if t == BNode("concept") else t for t in triple))
+    assert isomorphic(graph, renamed)
+    for validator in (validate_entity_model, validate_rdf_semantics):
+        errors = validator(graph, BASE)
+        assert errors
+        assert sorted(errors) == sorted(validator(renamed, BASE))
 
 
 @pytest.mark.parametrize("path", ["biology/stress response", "biology/β cells", "biology/%41GENTS"])
