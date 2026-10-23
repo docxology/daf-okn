@@ -83,7 +83,7 @@ named graph, so local data cannot prepopulate either remote stage. Offline
 queries reject `SERVICE` and dataset loading clauses. Every reported result row
 must be supported by the local mapping, remote mapping and remote label graphs.
 
-New captures use manifest schema version 2. They hash all capture queries and
+New captures use manifest schema version 3. They hash all capture queries and
 responses, the stored join query and both result files. Results include
 structured provenance matching the manifest. Replay derives and checks every
 required batch, count and artifact, then compares the recomputed result bytes.
