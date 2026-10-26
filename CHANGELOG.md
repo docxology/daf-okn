@@ -20,7 +20,7 @@ carry no meaning.
   under `<base>relation/` declared `rdfs:subPropertyOf skos:semanticRelation`; other node
   attributes stay available under `<base>vocab/`. N-Triples and N-Quads output is sorted and
   byte-stable.
-- Registry entries are written to `docs/registry/kgs/<shortname>.md` with exactly the fields
+- Registry entries are written to `registry/docs/registry/kgs/<shortname>.md` with exactly the fields
   the registry documents (`template`, `shortname`, `title`, `description`, `stats`, `homepage`,
   `funding` when supplied, `frink-options`, `contacts`).
 - Vault adapter: `[[links]]` resolve through frontmatter `aliases:` as well as paths and file

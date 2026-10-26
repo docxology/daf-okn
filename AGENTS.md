@@ -38,7 +38,7 @@ controls for verifier-like gates.
 ## Command line
 
 The `daf-okn` console script (also `python -m daf_okn`) exposes the pipeline as
-subcommands: `pull` (`list`, `snapshot` — also accepted as `save-snapshot` — `query`),
+subcommands: `pull` (`list`, `snapshot` (also accepted as `save-snapshot`), `query`),
 `analyze`, `bundle-rdf`, `export`, `explain-join`, `join`, `package`, `status`, and
 `visualize`. `package` writes the registry entry to
 `<out>/registry/docs/registry/kgs/<shortname>.md`. The scripts under
