@@ -53,7 +53,7 @@ new project — they are what the repo's gates enforce:
 | Invariant | Where it's taught | How it's enforced |
 |---|---|---|
 | Thin-orchestrator: `scripts/` only I/O + orchestration, logic in `src/daf_okn/` | [`architecture.md`](architecture.md), [`style_guide.md`](style_guide.md) | code review |
-| Zero mocks: real data, `tmp_path`, injected session stubs | [`testing_philosophy.md`](testing_philosophy.md) | `grep -r "unittest.mock\|MagicMock\|@patch" tests/` |
+| Zero mocks: real data, `tmp_path`, injected session stubs | [`testing_philosophy.md`](testing_philosophy.md) | `grep -rn "unittest.mock\|MagicMock\|@patch" --include='*.py' tests/` |
 | ≥90% project coverage on `src/` | [`testing_philosophy.md`](testing_philosophy.md) | `--cov-fail-under=90` (canonical command below) |
 | `manuscript/config.yaml` declares every `{{TOKEN}}` | [`rendering_pipeline.md`](rendering_pipeline.md), [`syntax_guide.md`](syntax_guide.md) | `test_all_manuscript_tokens_are_generated` |
 | Deterministic outputs (fixed seeds); everything in `output/` regeneratable | [`output_conventions.md`](output_conventions.md) | reproducibility checks |
@@ -70,7 +70,7 @@ uv run pytest tests/ \
     --cov=src --cov-fail-under=90 -q
 
 # No mocks in tests/
-grep -r "unittest.mock\|MagicMock\|@patch" tests/ || echo "Clean"
+grep -rn "unittest.mock\|MagicMock\|@patch" --include='*.py' tests/ || echo "Clean"
 ```
 
 ## See Also

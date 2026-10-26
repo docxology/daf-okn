@@ -38,7 +38,7 @@ assert metrics["top_central_nodes"][0] == ("c", pytest.approx(5 / 20))
 
 **Verify cleanliness**:
 ```bash
-grep -r "unittest.mock\|MagicMock\|@patch" tests/ || echo "Clean"
+grep -rn "unittest.mock\|MagicMock\|@patch" --include='*.py' tests/ || echo "Clean"
 ```
 
 ---

@@ -14,6 +14,12 @@ Commands (each is a thin wrapper over the library):
                    (:mod:`daf_okn.figures`, :mod:`daf_okn.dashboard`).
 * ``package``   -- OKN contribution package: RDF with standard vocabularies, registry
                    entry and checklist (:mod:`daf_okn.core.contribute`).
+* ``join``       -- capture or replay the bounded cross-graph join
+                   (:mod:`daf_okn.analysis.cross_graph`).
+* ``bundle-rdf`` -- verify and package the canonical cognitive RDF bundle and its
+                   review documentation (:mod:`daf_okn.core.rdf_submission`).
+* ``status``     -- offline JSON observation of existing graph/report evidence
+                   (:mod:`daf_okn.analysis.artifact_status`).
 * ``explain-join`` -- offline assertion-path support for a verified schema-3 capture
                    (:mod:`daf_okn.analysis.join_explanation`).
 

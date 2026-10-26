@@ -1,6 +1,6 @@
 # scripts/ - Orchestration Scripts
 
-**Thin Orchestrators** demonstrating strict integration patterns. These scripts *do not contain core logic*. They import from the `src/` directory, coordinate pipeline stages, and bridge results into `output/` artifacts. The same functionality is available through the `daf-okn` console script (also `python -m daf_okn`): `pull` (`list`, `save-snapshot`, `query`), `analyze`, `export`, `package`, `visualize`.
+**Thin Orchestrators** demonstrating strict integration patterns. These scripts *do not contain core logic*. They import from the `src/` directory, coordinate pipeline stages, and bridge results into `output/` artifacts. The same functionality is available through the `daf-okn` console script (also `python -m daf_okn`): `pull` (`list`, `snapshot`, `query`), `analyze`, `bundle-rdf`, `export`, `explain-join`, `join`, `package`, `status`, `visualize`.
 
 ## Quick Start
 

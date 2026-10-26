@@ -120,7 +120,7 @@ To add a new figure or data product:
 
 1. **Add the generator** in `src/daf_okn/figures/` or `src/daf_okn/analysis/` and wire it through the producing script (`10_research_workflow.py` or a sibling) — write to `output/figures/` or `output/data/` with a fixed, predictable filename.
 2. **Document it** in the artifact map above.
-3. **Update manuscript references** — reference the new file via `\\ref{fig:label}` or data table as appropriate.
+3. **Update manuscript references** — reference the new file via `[@fig:label]` or data table as appropriate.
 4. **Re-run the workflow** (steps 2–5 above).
 
 ## Troubleshooting

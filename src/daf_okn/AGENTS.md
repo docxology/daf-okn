@@ -233,7 +233,7 @@ Shared runtime helpers for `src/` modules: `project_root(caller)`, `get_logger`,
   degree, triangles, centralities, top central nodes).
 - `pipeline.py` — `run_analysis(graph, out_dir) -> dict` measures a `GraphDocument`,
   writes `graph_report.json` (`REPORT_FILENAME`), and returns the report as a dict.
-  CLI lives in `../scripts/analyze_graph.py` (thin wrapper).
+  CLI lives in `../../scripts/analyze_graph.py` (thin wrapper).
 
 ### figures/ package
 
@@ -251,7 +251,7 @@ Shared runtime helpers for `src/` modules: `project_root(caller)`, `get_logger`,
 - `dashboard.py` — `build_dashboard(doc, metrics, out_path, *, title=...)` writes the
   static, dependency-free HTML page (summary stats, capped tables, data-URI network
   figure, links to okn.us and registry.okn.us); `cli_main(argv)` is the CLI entry.
-- CLI in `../scripts/build_dashboard.py`.
+- CLI in `../../scripts/build_dashboard.py`.
 
 ## Configuration
 

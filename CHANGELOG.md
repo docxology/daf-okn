@@ -12,7 +12,7 @@ carry no meaning.
 ### Added
 
 - `daf-okn` command line (also `python -m daf_okn`) with `pull`, `export`, `analyze`,
-  `visualize` and `package` subcommands.
+  `visualize`, `package`, `join`, `explain-join`, `bundle-rdf` and `status` subcommands.
 - `daf_okn.core.rdf`: RDF serialization using SKOS, Dublin Core Terms and schema.org, aligned
   with the `cognitive` repository's reference exporter. Entity IRIs sit under
   `https://purl.org/okn/frink/kg/<shortname>/` and the named graph is

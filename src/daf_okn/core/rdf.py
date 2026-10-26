@@ -50,7 +50,6 @@ from .cognitive_adapter import (
     separate_document_topics,
 )
 from .graph import EdgeRecord, GraphDocument, NodeRecord
-from .keyword_terms import KEYWORD_TERMS as KEYWORD_TERMS
 from .keyword_terms import keyword_iri
 
 __all__ = [

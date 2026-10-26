@@ -44,7 +44,7 @@ the short version:
 
 | Class | Examples | Action |
 |---|---|---|
-| REQUIRED — pipeline gate | `src/daf_okn/core/graph.py`, `core/invariants.py`, `core/manuscript_variables.py` (graph primitives + token hydration), all `tests/test_*.py`, `pyproject.toml`, `manuscript/config.yaml`, `manuscript/*.md`, `manuscript/references.bib` | Keep them; the 90% coverage gate and the token cross-check test depend on them |
+| REQUIRED — pipeline gate | `src/daf_okn/core/graph.py`, `core/invariants.py`, `core/manuscript_variables.py` (graph primitives + token hydration), all `tests/**/test_*.py`, `pyproject.toml`, `manuscript/config.yaml`, `manuscript/*.md`, `manuscript/references.bib` | Keep them; the 90% coverage gate and the token cross-check test depend on them |
 | REQUIRED — orchestration | `src/daf_okn/analysis/`, `src/daf_okn/figures/`, `src/daf_okn/dashboard/`, all `scripts/*.py` | Exercised by `scripts/10_research_workflow.py` and the CLI smoke tests |
 | AESTHETIC | `docs/*.md`, `*/STYLE.md`, `*/PATTERNS.md`, `*/CONVENTIONS.md`, `*/AGENTS.md`, `*/README.md` | Convention only; aspire to update them when code changes |
 

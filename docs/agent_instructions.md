@@ -162,8 +162,8 @@ uv run pytest tests/ \
     --cov=src \
     --cov-fail-under=90 -q
 
-# 2. No mocks exist anywhere in tests/
-grep -r "unittest.mock\|MagicMock\|@patch\|create_autospec" \
+# 2. No mocks exist anywhere in tests/ (Python files only)
+grep -rn "unittest.mock\|MagicMock\|@patch\|create_autospec" --include='*.py' \
     tests/ || echo "Clean — no mocks found"
 ```
 

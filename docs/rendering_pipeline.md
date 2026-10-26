@@ -48,11 +48,11 @@ uv run python scripts/z_generate_manuscript_variables.py
 
 **Inputs**: `manuscript/config.yaml` + `output/data/graph_report.json`
 
-**What it does**: Calls `src/daf_okn/core/manuscript_variables.py::generate_variables(config_path, require_analysis_outputs=True)` (default) to compute all token values, then writes the flat `{TOKEN: value}` mapping to `output/data/manuscript_variables.json`. That is its only output.
+**What it does**: Calls `src/daf_okn/core/manuscript_variables.py::generate_variables(config_path, require_analysis_outputs=True)` (default) to compute all token values, then writes the flat `{TOKEN: value}` mapping to `output/data/manuscript_variables.json` and the token-substituted chapters to `output/manuscript/`.
 
 **Strict default**: Fails with `FileNotFoundError` when `output/data/graph_report.json` is missing. Use `--allow-draft` only for intentional early drafts that may emit `"N/A"` for result-derived tokens.
 
-**Output**: `output/data/manuscript_variables.json` — complete `{ "TOKEN": "value" }` mapping.
+**Output**: `output/data/manuscript_variables.json` — complete `{ "TOKEN": "value" }` mapping, plus the resolved chapters in `output/manuscript/`.
 
 ### Rendering
 

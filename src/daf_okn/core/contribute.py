@@ -49,13 +49,6 @@ __all__ = [
     "validate_package",
 ]
 
-OKN_DOCS = {
-    "contribute": "https://registry.okn.us/registry/contribute/",
-    "setup": "https://registry.okn.us/help/setup/",
-    "update": "https://registry.okn.us/help/update/",
-    "queries": "https://registry.okn.us/help/update-queries/",
-}
-
 REGISTRY_TEMPLATE = "overrides/kg.html"
 REGISTRY_KGS_DIR = Path("docs") / "registry" / "kgs"
 _SHORTNAME = re.compile(r"[a-z][a-z0-9-]*")

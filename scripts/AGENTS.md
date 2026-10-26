@@ -4,7 +4,7 @@
 
 The `scripts/` directory contains **Thin Orchestrators**. A "Thin Orchestrator" is a script that *strictly coordinates* business logic without implementing it directly. All complex operations must reside in the thoroughly tested `src/` directory; the scripts import from `src/` and write artifacts under `output/`.
 
-The same functionality is available through the `daf-okn` console script (also `python -m daf_okn`) with subcommands `pull` (`list`, `save-snapshot`, `query`), `analyze`, `export`, `package`, and `visualize`.
+The same functionality is available through the `daf-okn` console script (also `python -m daf_okn`) with subcommands `pull` (`list`, `snapshot`, `query`), `analyze`, `bundle-rdf`, `export`, `explain-join`, `join`, `package`, `status`, and `visualize`.
 
 ## Key Concepts
 

@@ -24,7 +24,7 @@ controls for verifier-like gates.
 | `core/invariants.py` | `validate_graph` (empty/duplicate ids, dangling endpoints, self-loops) and `graph_stats` | — |
 | `core/cognitive_adapter.py` | Obsidian-vault parser: `parse_frontmatter`, wiki links, semantic relations, `build_cognitive_graph`, `export_cognitive_kb` | `scripts/export_cognitive.py` |
 | `core/rdf.py` | `graph_to_rdf` / `build_rdf_graph`: RDF with SKOS/DCTERMS/schema.org terms; entity IRIs under `https://purl.org/okn/frink/kg/<shortname>/`, named graph `https://purl.org/okn/frink/kg/<shortname>`; custom relations become `<base>relation/<name>` sub-properties of `skos:semanticRelation`; other attributes under `<base>vocab/`; sorted, byte-stable N-Triples/N-Quads | `daf-okn package` |
-| `cli.py` | `daf-okn` / `python -m daf_okn`: `pull`, `export`, `analyze`, `visualize`, `package` | `daf-okn --help` |
+| `cli.py` | `daf-okn` / `python -m daf_okn`: `pull`, `export`, `analyze`, `visualize`, `package`, `join`, `explain-join`, `bundle-rdf`, `status` | `daf-okn --help` |
 | `core/contribute.py` | `registry_entry` (frontmatter limited to the registry's documented fields; never `sparql`/`tpf`), `contribution_checklist`, `upload_commands`, `validate_package` (writes `<shortname>.<fmt>`, `registry/docs/registry/kgs/<shortname>.md`, `checklist.md`), `PRESET_ENTRIES`, `register_graph` CLI | `scripts/register_graph.py` |
 | `core/manuscript_variables.py` | `generate_variables(config_path, require_analysis_outputs=True)` → flat `{{TOKEN}}` map from `manuscript/config.yaml` + `output/data/graph_report.json`; `--allow-draft` → `"N/A"` sentinels | `scripts/z_generate_manuscript_variables.py` |
 | `core/documentation.py` | `build_api_reference_markdown()` — introspection over the real modules; no static template | `scripts/generate_api_docs.py` |
@@ -38,8 +38,9 @@ controls for verifier-like gates.
 ## Command line
 
 The `daf-okn` console script (also `python -m daf_okn`) exposes the pipeline as
-subcommands: `pull` (`list`, `save-snapshot`, `query`), `analyze`, `export`,
-`package`, and `visualize`. `package` writes the registry entry to
+subcommands: `pull` (`list`, `snapshot` — also accepted as `save-snapshot` — `query`),
+`analyze`, `bundle-rdf`, `export`, `explain-join`, `join`, `package`, `status`, and
+`visualize`. `package` writes the registry entry to
 `<out>/registry/docs/registry/kgs/<shortname>.md`. The scripts under
 `scripts/` remain thin wrappers over the same `src/daf_okn` functions.
 
@@ -186,8 +187,9 @@ flowchart TB
 
 ### Code Style standards
 
-- **Ruff formatting** (`uv run ruff format`): 88-character line length (default
-  alignment), consistent formatting — mirrors CI
+- **Ruff formatting** (`uv run ruff format`): 100-character line length
+  (`[tool.ruff] line-length` in `pyproject.toml`), consistent formatting — CI runs
+  `ruff check .`
 - **Descriptive names**: Clear variable and function names
 - **Import organization**: Standard library, third-party, local imports
   properly organized

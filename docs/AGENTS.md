@@ -12,6 +12,7 @@ Technical guide for `docs/` — the operational rulebook for AI agents and devel
 | `AGENTS.md` | This index — technical overview of `docs/` | ~110 | Current |
 | `agent_instructions.md` | Behavioral constraints for AI agents (read-first priority) | ~160 | Comprehensive |
 | `architecture.md` | Thin orchestrator flow: layers, dependencies, forbidden patterns, how-to-add-a-capability | ~100 | Comprehensive |
+| `stack-integration.md` | Local artifact status, Sidecar foothold and separate native acceptance evidence | ~90 | Current |
 | `testing_philosophy.md` | Zero-mock policy; coverage mechanics; test-file inventory (live counts via `--collect-only`) | ~110 | Comprehensive |
 | `faq.md` | Frequently asked questions about architecture, testing, manuscripts | ~130 | Comprehensive |
 | `troubleshooting.md` | Symptom-driven recipes for common failures | ~253 | Comprehensive |
@@ -55,7 +56,7 @@ uv run pytest tests/ \
     --cov-fail-under=90 -q
 
 # No mocks in tests/
-grep -r "unittest.mock\|MagicMock\|@patch\|create_autospec" \
+grep -rn "unittest.mock\|MagicMock\|@patch\|create_autospec" --include='*.py' \
     tests/ || echo "Clean"
 ```
 
