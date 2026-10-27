@@ -1,3 +1,27 @@
+# daf-okn task index
+
+The canonical task records are in [tasks.yaml](tasks.yaml). Follow the linked IDs
+for current status, dependencies, acceptance criteria, prompts and owner holds.
+This view records no independent task state. Preserve blocked and completed records.
+
+Native contracts: [AGENTS.md](AGENTS.md). Task and gate signposts:
+[public/links.toml](.docxology/public/links.toml). Resolve ecosystem members from
+`daf_stack.manifest.default_manifest()`; Flywheel proposals and Horizon previews
+remain subject to Operator policy, source freshness and separate execution admission.
+
+- [daf-okn-stack-onboarding](tasks.yaml#L5) — Verify the offline package gate for stack onboarding
+- [daf-okn-artifact-status](tasks.yaml#L10) — Inspect local graph and report evidence without regeneration
+- [daf-okn-stack-status-consumer](tasks.yaml#L16) — Admit artifact status into stack and operator evidence views
+
+## Retained notes
+
+The following material is preserved verbatim as historical context. Its checkboxes,
+status labels, counts and suggestions are not a current queue or validation receipt.
+Unmapped suggestions require owner reconciliation against canonical task IDs before work.
+Read the board above for current state; these notes grant no dispatch authority.
+
+---
+
 # daf-okn TODO
 
 Forward workplan for the DAF-OKN project: pull, analyze, visualize, and

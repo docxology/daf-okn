@@ -11,3 +11,16 @@ local_contract = "docs/stack-integration.md"
 local_board = "tasks.yaml"
 native_gate = "bash scripts/gate.sh"
 # daf-dot owns real-time voice protocol; daf-operator owns spatialized information.
+
+# Nonsecret task navigation only; commands are not validation receipts or execution grants.
+[task_handoff]
+path_base = "repository-root"
+repository = "docxology/daf-okn"
+board = "tasks.yaml"
+todo = "TODO.md"
+native_gate = "bash scripts/gate.sh"
+native_contract = "AGENTS.md"
+stack_registry = "../../Private/daf-stack/src/daf_stack/manifest.py"
+flywheel_contract = "../../Private/daf-flywheel/docs/continuous-factory.md"
+horizon_contract = "../../Private/daf-horizon/docs/evidence.md"
+operator_contract = "../../Private/daf-operator/docs/TASK_MODEL.md"
