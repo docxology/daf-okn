@@ -14,7 +14,7 @@ The `docs/` directory contains the behavioral and architectural rules that gover
 |---|---|---|
 | [`agent_instructions.md`](agent_instructions.md) | 7 hard rules for AI agents; verification checklist | AI agents, all developers |
 | [`architecture.md`](architecture.md) | Layer table, dependency direction, forbidden patterns, how-to-add-a-capability | Developers |
-| [`stack-integration.md`](stack-integration.md) | Local artifact status, Sidecar foothold and separate native acceptance evidence | Stack consumers, agents |
+| [`stack-integration.md`](stack-integration.md) | Local artifact status, read-only stack roster membership, Sidecar foothold and separate native acceptance evidence | Stack consumers, agents |
 | [`testing_philosophy.md`](testing_philosophy.md) | Zero-mock policy, test-file inventory, coverage mechanics, the gate-vs-exit-code rule (live counts → `uv run pytest tests/ --collect-only -q`) | Developers, testers |
 | [`rendering_pipeline.md`](rendering_pipeline.md) | Research workflow; manuscript variables; rendering notes; config.yaml controls | Content authors, developers |
 | [`style_guide.md`](style_guide.md) | 7 rules: Zero-Mock, Module Layering, Thin Orchestrator, Show-Not-Tell, Explicit Paths, Type Hints, Error Messages | Developers |

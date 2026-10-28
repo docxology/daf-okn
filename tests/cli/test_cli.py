@@ -6,6 +6,7 @@ Everything runs against real files in ``tmp_path``; no command here touches the 
 
 from __future__ import annotations
 
+import io
 import json
 import subprocess
 import sys
@@ -62,11 +63,13 @@ def test_python_dash_m_help_lists_every_command() -> None:
         check=False,
     )
     assert result.returncode == 0, result.stderr
-    for command in ("pull", "export", "analyze", "visualize", "package"):
+    for command in ("pull", "export", "analyze", "visualize", "package", "stack-health"):
         assert command in result.stdout
 
 
-@pytest.mark.parametrize("command", ["pull", "export", "analyze", "visualize", "package"])
+@pytest.mark.parametrize(
+    "command", ["pull", "export", "analyze", "visualize", "package", "stack-health"]
+)
 def test_every_command_has_help(command: str, capsys) -> None:
     with pytest.raises(SystemExit) as exit_info:
         main([command, "--help"])
@@ -459,3 +462,99 @@ def test_package_cli_rejects_aliased_output_before_writing(tmp_path: Path, capsy
     assert "alias" in capsys.readouterr().out
     assert graph_output.read_text(encoding="utf-8") == "preserve"
     assert not (out_dir / "registry").exists()
+
+
+# --------------------------------------------------------------------- stack-health
+STACK_FILES = (
+    "AGENTS.md",
+    "README.md",
+    "pyproject.toml",
+    "uv.lock",
+    "scripts/gate.sh",
+    "tasks.yaml",
+)
+
+
+def _stack_checkout(tmp_path: Path) -> Path:
+    """A checkout satisfying the roster entry written by ``_roster_file``."""
+    root = tmp_path / "checkout"
+    (root / ".git").mkdir(parents=True)
+    (root / ".git" / "HEAD").write_text("ref: refs/heads/main\n", encoding="utf-8")
+    for name in STACK_FILES:
+        target = root / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text("content\n", encoding="utf-8")
+    return root
+
+
+def _roster_file(tmp_path: Path, root: Path) -> Path:
+    roster = {
+        "daf_root": str(root.parent),
+        "repos": [
+            {
+                "name": "daf-okn",
+                "path": str(root),
+                "branch": "main",
+                "require_board": True,
+                "require_sidecar": False,
+                "gate_cmd": "bash scripts/gate.sh",
+                "required_files": list(STACK_FILES),
+                "board_path": str(root / "tasks.yaml"),
+            }
+        ],
+    }
+    path = tmp_path / "roster.json"
+    path.write_text(json.dumps(roster), encoding="utf-8")
+    return path
+
+
+def test_stack_health_passes_for_a_satisfied_checkout(tmp_path: Path, capsys) -> None:
+    root = _stack_checkout(tmp_path)
+    roster = _roster_file(tmp_path, root)
+    code = main(["stack-health", "--roster", str(roster), "--checkout", str(root)])
+    health = json.loads(capsys.readouterr().out)
+    assert code == 0
+    assert health["status"] == "pass"
+    assert health["native_gate"] == "not_run"
+
+
+def test_stack_health_fails_on_a_missing_declared_file(tmp_path: Path, capsys) -> None:
+    root = _stack_checkout(tmp_path)
+    (root / "uv.lock").unlink()
+    roster = _roster_file(tmp_path, root)
+    code = main(["stack-health", "--roster", str(roster), "--checkout", str(root)])
+    health = json.loads(capsys.readouterr().out)
+    assert code == 1
+    assert health["status"] == "fail"
+    files = {check["name"]: check for check in health["checks"]}
+    assert files["required_files"]["detail"] == "missing: uv.lock"
+
+
+def test_stack_health_reads_stdin(tmp_path: Path, capsys, monkeypatch) -> None:
+    root = _stack_checkout(tmp_path)
+    monkeypatch.setattr(sys, "stdin", io.StringIO(_roster_file(tmp_path, root).read_text()))
+    assert main(["stack-health", "--roster", "-", "--checkout", str(root)]) == 0
+    assert json.loads(capsys.readouterr().out)["checkout"] == str(root)
+
+
+def test_stack_health_unknown_member_is_a_reported_error(tmp_path: Path, capsys) -> None:
+    root = _stack_checkout(tmp_path)
+    roster = _roster_file(tmp_path, root)
+    code = main(
+        ["stack-health", "--roster", str(roster), "--member", "daf-nope", "--checkout", str(root)]
+    )
+    assert code == 1
+    assert "roster has no member 'daf-nope'" in capsys.readouterr().err
+
+
+def test_stack_health_malformed_roster_is_a_reported_error(tmp_path: Path, capsys) -> None:
+    bad = tmp_path / "roster.json"
+    bad.write_text("{", encoding="utf-8")
+    assert main(["stack-health", "--roster", str(bad)]) == 1
+    assert "roster is not valid JSON" in capsys.readouterr().err
+
+
+def test_stack_health_requires_a_roster_argument() -> None:
+    with pytest.raises(SystemExit) as exit_info:
+        main(["stack-health"])
+    assert exit_info.value.code == 2

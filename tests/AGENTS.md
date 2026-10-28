@@ -113,6 +113,9 @@ All tests in this project enforce a strict **Zero-Mock Policy**. Validation uses
    `--allow-draft` sentinels, live manuscript token cross-reference
 7. **test_documentation.py / test_project_paths.py / test_runtime.py** — API
    reference builder, path resolution, runtime helpers
+8. **test_stack_roster.py** — `daf-stack` roster shape parsing, branch/file/
+   gate/board/Sidecar membership checks, and this checkout against the
+   requirements the stack manifest declares for it
 
 #### Metric and orchestration tests (`tests/analysis/`, `tests/figures/`, `tests/dashboard/`)
 

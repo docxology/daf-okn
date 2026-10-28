@@ -63,6 +63,7 @@ See [canonical RDF and cross-graph workflows](docs/okn/cross-graph.md).
 | `daf-okn export --repo DIR [--out FILE] [--name NAME] [--keep-redirects] [--no-wikilinks]` | Read a vault (or a `cognitive` checkout, using its `knowledge_base/`) into graph JSON. |
 | `daf-okn analyze --graph FILE [--out-dir DIR]` | Write `graph_report.json` with structural metrics; exits 1 if the graph breaks an invariant (dangling edge, duplicate id, ...). |
 | `daf-okn status --graph FILE [--report FILE]` | Read-only JSON observation of graph invariants and optional report consistency; exits 1 for missing, malformed or inconsistent evidence. |
+| `daf-okn stack-health --roster FILE [--member NAME] [--checkout DIR]` | Compare this checkout with one `daf-stack-doctor roster` member (offline, read-only): roster path, branch, required files, gate command, board and Sidecar manifest. |
 | `daf-okn visualize --graph FILE [--figure PNG] [--dashboard HTML] [--metrics JSON] [--layout NAME]` | Render the network figure and the HTML dashboard (`--no-figure` / `--no-dashboard` skip one). |
 | `daf-okn package --graph FILE --out-dir DIR [--fmt nq] [--preset NAME] [--entry-*] [--contact ...]` | Write the contribution package; exits 1 and lists problems if the entry is incomplete. |
 | `daf-okn join --source FILE --query FILE --output DIR [--replay CAPTURE]` | Capture or replay the bounded cognitive-to-OBO assertion path. |
@@ -78,7 +79,9 @@ predicate, review record and captured response origin visible for inspection.
 The scripts in `scripts/` are thin wrappers over the same code (`scripts/10_research_workflow.py`
 chains pull, export, analyze and visualize for the research manuscript).
 
-Stack consumers should start with [local status and Sidecar evidence](docs/stack-integration.md).
+Stack consumers should start with [local status, roster membership and Sidecar
+evidence](docs/stack-integration.md). `stack-health` runs the roster comparison offline; it
+never executes the gate.
 
 ## Contributing a graph to the OKN registry
 

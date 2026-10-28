@@ -34,6 +34,7 @@ All test files live in cluster subdirectories mirroring
 | `core/test_documentation.py` | `core/documentation.py` API reference helpers |
 | `core/test_project_paths.py` | `resolve_project_root` and path overrides |
 | `core/test_runtime.py` | `core/_runtime.py` helpers (logger, figure-data persistence) |
+| `core/test_stack_roster.py` | `daf-stack` roster parsing and offline membership checks |
 | `analysis/test_graph_metrics.py` | `compute_metrics` and metric helpers |
 | `analysis/test_scripts_smoke.py` | Subprocess smoke for auxiliary scripts (`generate_api_docs.py`, `00_preflight.py`) |
 | `figures/test_network_figure.py` | Deterministic PNG figure builders |
@@ -56,6 +57,7 @@ graph TD
     FIG[test_network_figure.py] --> FIGS[src/daf_okn/figures/network_figure.py]
     DASH[test_dashboard_dafokn.py] --> DB[src/daf_okn/dashboard/]
     SMK[test_scripts_smoke.py] --> SCRIPTS[scripts/ auxiliary]
+    RST[test_stack_roster.py] --> SR[src/daf_okn/core/stack_roster.py]
 ```
 
 > **Zero-Mock Policy**: Tests use real graph fixtures, temp files, and generated artifacts. No `unittest.mock`, `MagicMock`, or `@patch`. Orchestration modules may use `pytest.MonkeyPatch` on module attributes and subprocess import isolation — see [`PATTERNS.md`](PATTERNS.md).

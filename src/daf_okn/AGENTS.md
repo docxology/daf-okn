@@ -10,6 +10,10 @@ The `src/` directory contains the importable project logic for the daf-okn proje
 - **Pure scientific core**: `core/graph.py`, `core/invariants.py`, `core/cognitive_adapter.py`, and the parsing half of `core/registry.py` are side-effect-free. They take inputs and return outputs.
 - **Network at the edges**: `OKNRegistry` performs HTTP I/O only inside methods (per-graph/federation SPARQL, TPF, VoID, embeddings); no I/O happens at import, and tests inject a `requests.Session`.
 - **Importable project workflows**: `analysis/`, `figures/`, `dashboard/`, and the manuscript-variable/API-reference builders may perform explicit file I/O, but scripts should only delegate to them.
+- **Stack roster consumer**: `core/stack_roster.py` reads the JSON printed by
+  `daf-stack-doctor roster` and compares one member entry (path, branch, required
+  files, gate command, board, Sidecar manifest) against this checkout. It runs no
+  command, writes nothing and reports `native_gate: not_run`.
 - **Zero-mock testability**: pure functions are tested exhaustively with real data; workflow modules are tested through real temp files, subprocesses, and generated artifacts.
 - **Type safety** with comprehensive type hints and Google-style docstrings.
 

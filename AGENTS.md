@@ -29,6 +29,7 @@ controls for verifier-like gates.
 | `core/manuscript_variables.py` | `generate_variables(config_path, require_analysis_outputs=True)` → flat `{{TOKEN}}` map from `manuscript/config.yaml` + `output/data/graph_report.json`; `--allow-draft` → `"N/A"` sentinels | `scripts/z_generate_manuscript_variables.py` |
 | `core/documentation.py` | `build_api_reference_markdown()` — introspection over the real modules; no static template | `scripts/generate_api_docs.py` |
 | `core/project_paths.py` | `resolve_project_root`, `project_root_context`, `project_output_dirs` | — |
+| `core/stack_roster.py` | Offline consumer of the `daf-stack-doctor roster` JSON: `parse_roster`, `check_member`, `read_branch`; no gate execution, no writes, no network | `daf-okn stack-health` |
 | `core/_runtime.py` | `get_logger`, `save_figure_data` | — |
 | `analysis/graph_metrics.py` | `compute_metrics`: node/edge counts, density, connectivity, mean degree, triangles, degree/betweenness centrality, top central nodes; helpers for degree sequences and edge scores | — |
 | `analysis/pipeline.py` | `run_analysis(graph, out_dir)` → `graph_report.json` (`REPORT_FILENAME`); `FileNotFoundError` in pipeline mode when the report is missing | `scripts/analyze_graph.py` |
@@ -39,8 +40,8 @@ controls for verifier-like gates.
 
 The `daf-okn` console script (also `python -m daf_okn`) exposes the pipeline as
 subcommands: `pull` (`list`, `snapshot` (also accepted as `save-snapshot`), `query`),
-`analyze`, `bundle-rdf`, `export`, `explain-join`, `join`, `package`, `status`, and
-`visualize`. `package` writes the registry entry to
+`analyze`, `bundle-rdf`, `export`, `explain-join`, `join`, `package`,
+`stack-health`, `status`, and `visualize`. `package` writes the registry entry to
 `<out>/registry/docs/registry/kgs/<shortname>.md`. The scripts under
 `scripts/` remain thin wrappers over the same `src/daf_okn` functions.
 
@@ -260,3 +261,7 @@ quick reference commands, and pitfalls.
 `bash scripts/gate.sh` is the offline stack gate. It uses `uv.lock` and the
 development dependencies, propagates pytest failures, and enforces the existing
 90% branch coverage threshold. It accepts no test-selection overrides.
+
+`daf-okn stack-health --roster ROSTER --checkout .` re-reads the stack roster entry for
+this checkout offline and lists each declared requirement; it does not run the
+gate it declares. See [`docs/stack-integration.md`](docs/stack-integration.md).

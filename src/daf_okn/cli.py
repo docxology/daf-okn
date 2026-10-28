@@ -22,6 +22,9 @@ Commands (each is a thin wrapper over the library):
                    (:mod:`daf_okn.analysis.artifact_status`).
 * ``explain-join`` -- offline assertion-path support for a verified schema-3 capture
                    (:mod:`daf_okn.analysis.join_explanation`).
+* ``stack-health`` -- offline check of this checkout against one member entry in
+                   the ``daf-stack-doctor roster`` JSON
+                   (:mod:`daf_okn.core.stack_roster`).
 
 Exit status is 0 on success and 1 on a reported failure; argument errors exit 2.
 """
@@ -56,6 +59,15 @@ def _cmd_status(args: argparse.Namespace) -> int:
     observation = inspect_artifacts(args.graph, args.report)
     print(json.dumps(observation, indent=2, sort_keys=True))
     return 0 if observation["status"] == "pass" else 1
+
+
+def _cmd_stack_health(args: argparse.Namespace) -> int:
+    from .core.stack_roster import check_member, parse_roster
+
+    text = sys.stdin.read() if str(args.roster) == "-" else args.roster.read_text(encoding="utf-8")
+    health = check_member(parse_roster(text).select(args.member), args.checkout)
+    print(json.dumps(health, indent=2, sort_keys=True))
+    return 0 if health["status"] == "pass" else 1
 
 
 def _cmd_join(args: argparse.Namespace) -> int:
@@ -334,6 +346,29 @@ def build_parser() -> argparse.ArgumentParser:
     status.add_argument("--graph", required=True, type=Path, help="existing graph JSON")
     status.add_argument("--report", type=Path, help="existing graph_report.json to remeasure")
     status.set_defaults(func=_cmd_status)
+    health = commands.add_parser(
+        "stack-health",
+        help="verify this checkout against a daf-stack roster entry (offline)",
+        description=(
+            "Read the JSON printed by `daf-stack-doctor roster` and check the named member's "
+            "declared requirements against a checkout: roster path, branch, required files, "
+            "gate command, board and Sidecar manifest. No gate is executed, nothing is "
+            "written and no network is used. Exits 0 when every declared requirement holds."
+        ),
+    )
+    health.add_argument(
+        "--roster", required=True, type=Path, help="roster JSON file, or - to read stdin"
+    )
+    health.add_argument(
+        "--member", default="daf-okn", help="roster member name (default: %(default)s)"
+    )
+    health.add_argument(
+        "--checkout",
+        type=Path,
+        default=Path("."),
+        help="checkout to verify (default: current directory)",
+    )
+    health.set_defaults(func=_cmd_stack_health)
     return parser
 
 

@@ -1,4 +1,4 @@
-# Local status and Sidecar evidence
+# Local status, stack roster and Sidecar evidence
 
 daf-okn owns OKN registry access, graph analysis, capture/replay and contribution
 packaging. The cognitive repository owns its graph and exporter. daf-dot owns
@@ -42,6 +42,60 @@ the repository revision, board, gate results or registry acceptance.
 
 For canonical RDF custody, continue using `daf-okn bundle-rdf --check --output
 BUNDLE` and the [existing custody/replay contracts](okn/custody-and-replay.md).
+
+## Roster membership (read-only)
+
+`daf-stack` owns the stack inventory. `daf-stack-doctor roster` publishes it as
+JSON, and this public checkout consumes that contract without importing
+daf-stack:
+
+```bash
+# from the daf-stack checkout
+daf-stack-doctor roster --repo daf-okn > roster.json
+
+# from this checkout
+daf-okn stack-health --roster roster.json --checkout .
+```
+
+`src/daf_okn/core/stack_roster.py::parse_roster` validates the roster document
+and `check_member` compares one member entry with the checkout on disk.
+`--roster -` reads stdin, `--member` defaults to `daf-okn` and `--checkout`
+defaults to the current directory. The `daf-okn.stack-roster/1` payload holds:
+
+| Field | Meaning |
+| --- | --- |
+| `schema` | `daf-okn.stack-roster/1` |
+| `status` | `pass` only when every check below holds |
+| `member`, `roster_entry_path`, `checkout` | Roster claims compared with resolved paths |
+| `expected_branch`, `measured_branch` | Roster branch and the branch in `.git/HEAD`; `null` when undeclared or unreadable |
+| `checks` | One `{name, ok, detail}` per declared requirement |
+| `native_gate` | Always `not_run` |
+
+The checks are `path` (the roster names this checkout), `branch`,
+`required_files` (each declared checkout-relative path exists), `gate` (a
+declared `gate_cmd` whose relative paths exist), `board` (the roster's
+`board_path`, which must stay inside the checkout, or `<checkout>/tasks.yaml`,
+when `require_board`), and `sidecar` (`.docxology/manifest.toml` when
+`require_sidecar`). Scoping `board_path` to the checkout keeps a mismatched
+checkout from passing the board check on another tree's file.
+
+Exit 0 when every declared requirement holds, 1 for a failing member or an
+unreadable/malformed roster, 2 for missing arguments. No command is executed,
+nothing is written and no network is used. The observation is offline
+membership evidence only: it does not establish that the gate passes, that the
+roster is current, or that the coordinator accepted this member. `read_branch`
+follows a worktree `.git` file to its `gitdir` and reads `HEAD`; a detached
+HEAD has no branch, so a declared branch then fails rather than passing by
+default.
+
+`tests/core/test_stack_roster.py` parses real roster-shaped documents, rejects
+malformed, absent and duplicate members, and compares this public checkout with
+the requirements the daf-stack manifest declares for it (name, path, branch,
+the six required files, `bash scripts/gate.sh`, the board). Negative controls
+cover a mismatched path or branch, a missing required file, a missing gate
+script, an unparseable gate command, a required board/Sidecar manifest and an
+out-of-checkout `required_files` entry. `tests/cli/test_cli.py` covers the CLI
+exit codes, stdin input and malformed-roster reporting.
 
 ## Sidecar foothold
 

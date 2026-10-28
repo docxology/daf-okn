@@ -4,6 +4,21 @@ All notable changes to this project are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [semantic versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- `daf-okn stack-health --roster FILE [--member NAME] [--checkout DIR]` and
+  `daf_okn.core.stack_roster`: an offline, read-only consumer of the
+  `daf-stack-doctor roster` JSON. It validates the roster shape and compares the
+  named member's declared path, branch, required files, gate command, board and
+  Sidecar manifest with a checkout. No gate is executed, nothing is written and no
+  network is used; the payload keeps `native_gate: not_run`.
+- `tests/core/test_stack_roster.py` (roster parsing, malformed/duplicate/absent
+  members, path/branch/file/gate/board/Sidecar negative controls, this checkout
+  against the requirements the daf-stack manifest declares) and CLI coverage for
+  the new subcommand.
+
 ## [0.2.0] - 2026-10-12
 
 First public release. Earlier version numbers (such as 2.5.2) came from a project template and

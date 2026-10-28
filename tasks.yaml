@@ -20,3 +20,9 @@ tasks:
     priority: medium
     deps: [daf-okn-artifact-status]
     notes: "Coordinate with daf-stack and daf-operator owners. Consume daf_okn.cli:main status JSON via the existing admitted console bridge; install runtime before calls, preserve unassessed fields, independently bind source/board/gate evidence. Negative control: missing report or changed input must not retain a passing artifact observation. Sidecar coverage is separate. See docs/stack-integration.md."
+  - id: daf-okn-stack-roster-consumer
+    title: Consume the stack roster offline to prove external dual-use membership
+    status: done
+    priority: medium
+    validationCommand: bash scripts/gate.sh
+    notes: "Added src/daf_okn/core/stack_roster.py and the daf-okn stack-health CLI: parse the daf-stack-doctor roster JSON, then check the declared path, branch, required files, gate command, board and Sidecar manifest against a checkout without running the gate or writing files. A roster captured with daf-stack-doctor roster --repo daf-okn passes; negative controls cover path or branch mismatch, a missing required file or gate script, an unparseable gate, a missing board or Sidecar manifest, and malformed, duplicate or absent members. See docs/stack-integration.md."

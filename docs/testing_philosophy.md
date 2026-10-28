@@ -21,6 +21,7 @@ If you ever feel the urge to mock something in a test for `src/`, treat it as a 
 | `tests/core/test_contribute.py` | N-Quads round-trips, registry entry, checklist, `validate_package` |
 | `tests/core/test_manuscript_variables.py` | `{{TOKEN}}` map from config + `graph_report.json`, `--allow-draft` sentinels, live manuscript cross-reference |
 | `tests/core/test_documentation.py` | `core/documentation.py` API reference builder |
+| `tests/core/test_stack_roster.py` | `daf-stack` roster parsing and offline membership checks (`stack-health`) |
 | `tests/core/test_project_paths.py` | `resolve_project_root` and context overrides |
 | `tests/core/test_runtime.py` | `core/_runtime.py` helpers |
 | `tests/analysis/test_graph_metrics.py` | `compute_metrics` and metric helpers |

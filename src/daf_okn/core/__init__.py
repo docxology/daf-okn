@@ -12,6 +12,9 @@ This cluster keeps the graph model and shared helpers:
 * :mod:`daf_okn.core.manuscript_variables` — flat ``{{TOKEN}}`` substitution
   map hydrated from ``manuscript/config.yaml`` and the graph report.
 * :mod:`daf_okn.core.documentation` — introspected API reference builder.
+* :mod:`daf_okn.core.stack_roster` — offline reader for the
+  ``daf-stack-doctor roster`` contract (:func:`parse_roster`,
+  :func:`check_member`).
 """
 
 from .documentation import (
