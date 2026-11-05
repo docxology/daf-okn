@@ -12,6 +12,7 @@ remain subject to Operator policy, source freshness and separate execution admis
 - [daf-okn-stack-onboarding](tasks.yaml#L5) — Verify the offline package gate for stack onboarding
 - [daf-okn-artifact-status](tasks.yaml#L10) — Inspect local graph and report evidence without regeneration
 - [daf-okn-stack-status-consumer](tasks.yaml#L16) — Admit artifact status into stack and operator evidence views
+- [daf-okn-stack-roster-consumer](tasks.yaml#L23) — Consume the stack roster offline to prove external dual-use membership
 
 ## Retained notes
 
