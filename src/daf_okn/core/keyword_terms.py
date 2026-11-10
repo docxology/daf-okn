@@ -83,9 +83,9 @@ class KeywordTerm:
             raise ValueError("keyword evidence must be a nonempty tuple of official URLs")
         for url in self.evidence:
             _http_iri(url)
-        ncit = re.fullmatch(r"http://purl.obolibrary.org/obo/NCIT_(C[0-9]+)", self.iri)
-        mesh = re.fullmatch(r"http://id.nlm.nih.gov/mesh/(D[0-9]+)", self.iri)
-        stato = re.fullmatch(r"http://purl.obolibrary.org/obo/STATO_[0-9]{7}", self.iri)
+        ncit = re.fullmatch(r"http://purl\.obolibrary\.org/obo/NCIT_(C[0-9]+)", self.iri)
+        mesh = re.fullmatch(r"http://id\.nlm\.nih\.gov/mesh/(D[0-9]+)", self.iri)
+        stato = re.fullmatch(r"http://purl\.obolibrary\.org/obo/STATO_[0-9]{7}", self.iri)
         if ncit:
             expected = f"https://api-evsrest.nci.nih.gov/api/v1/concept/ncit/{ncit[1]}?include=full"
             if self.evidence != (expected,):
@@ -95,14 +95,14 @@ class KeywordTerm:
             if (
                 len(self.evidence) != 2
                 or self.evidence[0] != expected
-                or not re.fullmatch(r"https://id.nlm.nih.gov/mesh/M[0-9]+\.json", self.evidence[1])
+                or not re.fullmatch(r"https://id\.nlm\.nih\.gov/mesh/M[0-9]+\.json", self.evidence[1])
             ):
                 raise ValueError(
                     "MeSH keyword evidence requires descriptor and preferred-concept URLs"
                 )
         elif stato:
             if len(self.evidence) != 1 or not re.fullmatch(
-                r"https://raw.githubusercontent.com/ISA-tools/stato/[0-9a-f]{40}/releases/latest_release/stato\.owl",
+                r"https://raw\.githubusercontent\.com/ISA-tools/stato/[0-9a-f]{40}/releases/latest_release/stato\.owl",
                 self.evidence[0],
             ):
                 raise ValueError("STATO keyword evidence must pin the official release commit")
