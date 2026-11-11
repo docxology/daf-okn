@@ -95,7 +95,9 @@ class KeywordTerm:
             if (
                 len(self.evidence) != 2
                 or self.evidence[0] != expected
-                or not re.fullmatch(r"https://id\.nlm\.nih\.gov/mesh/M[0-9]+\.json", self.evidence[1])
+                or not re.fullmatch(
+                    r"https://id\.nlm\.nih\.gov/mesh/M[0-9]+\.json", self.evidence[1]
+                )
             ):
                 raise ValueError(
                     "MeSH keyword evidence requires descriptor and preferred-concept URLs"
