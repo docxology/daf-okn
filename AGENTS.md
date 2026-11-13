@@ -259,8 +259,9 @@ quick reference commands, and pitfalls.
 ## Stack onboarding gate
 
 `bash scripts/gate.sh` is the offline stack gate. It uses `uv.lock` and the
-development dependencies, propagates pytest failures, and enforces the existing
-90% branch coverage threshold. It accepts no test-selection overrides.
+development dependencies, runs `ruff check .` and `mypy -p daf_okn` (the CI lint
+job), propagates pytest failures, and enforces the existing 90% branch coverage
+threshold. It accepts no test-selection overrides.
 
 `daf-okn stack-health --roster ROSTER --checkout .` re-reads the stack roster entry for
 this checkout offline and lists each declared requirement; it does not run the
