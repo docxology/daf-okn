@@ -28,7 +28,7 @@ import hashlib
 import json
 import logging
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -64,7 +64,7 @@ def _record_provenance(
     }
     record: dict[str, object] = {
         "graph": doc.name,
-        "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "generated_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "node_count": len(doc.nodes),
         "edge_count": len(doc.edges),
         "package_dir": str(package_dir),

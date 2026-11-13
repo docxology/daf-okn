@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal, TypedDict
 
@@ -66,7 +66,7 @@ def inspect_artifacts(graph_path: Path, report_path: Path | None = None) -> Arti
     )
     result: ArtifactStatus = {
         "schema": "daf-okn.artifact-status/1",
-        "observed_at": datetime.now(timezone.utc).isoformat(),
+        "observed_at": datetime.now(UTC).isoformat(),
         "status": "fail",
         "graph": graph_observation,
         "report": report_observation,

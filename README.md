@@ -22,7 +22,7 @@ registry for you: `package` writes files and prints the steps.
 
 ## Install
 
-Python 3.10 or newer is declared; CI runs the tests on 3.12 and 3.14.
+Python 3.11 or newer is declared; CI runs the tests on 3.12, 3.14 and 3.15.
 
 ```bash
 git clone https://github.com/docxology/daf-okn

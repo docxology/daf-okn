@@ -14,6 +14,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 SCRIPTS_DIR = PROJECT_ROOT / "scripts"
@@ -86,6 +88,19 @@ def test_preflight_detects_missing_config(tmp_path: Path) -> None:
     ok, lines = preflight.run_preflight(tmp_path)
     assert not ok
     assert any("manuscript/config.yaml" in line for line in lines)
+
+
+def test_preflight_enforces_declared_python_floor(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The preflight floor matches pyproject's ``requires-python = ">=3.11"``."""
+    from importlib import import_module
+
+    preflight = import_module("00_preflight")
+    monkeypatch.setattr(sys, "version_info", (3, 10, 14, "final", 0))
+    ok, lines = preflight.run_preflight(tmp_path)
+    assert not ok
+    assert "[fail] python 3.10 < required 3.11" in lines
 
 
 def test_z_generate_manuscript_variables_allow_draft(tmp_path: Path) -> None:
