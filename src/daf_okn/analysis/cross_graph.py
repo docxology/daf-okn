@@ -6,7 +6,7 @@ import hashlib
 import json
 import re
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Final
 from urllib.error import HTTPError, URLError
@@ -613,7 +613,7 @@ def _run(args: JoinOptions) -> None:
         captures += capture_stage(external, UBERGRAPH, (args.endpoint, out))
         add_captures(dataset, captures, out)
         manifest = {
-            "observed_at": datetime.now(timezone.utc).isoformat(),
+            "observed_at": datetime.now(UTC).isoformat(),
             "endpoint": args.endpoint,
             "local_sha256": sha256(source),
             "join_query_sha256": sha256(query),

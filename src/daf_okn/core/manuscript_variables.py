@@ -23,7 +23,7 @@ import json
 import os
 import platform
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -84,11 +84,11 @@ def _build_timestamp() -> str:
     epoch = os.environ.get("SOURCE_DATE_EPOCH")
     if epoch:
         try:
-            moment = datetime.fromtimestamp(int(epoch), tz=timezone.utc)
+            moment = datetime.fromtimestamp(int(epoch), tz=UTC)
             return moment.strftime("%Y-%m-%dT%H:%M:%SZ")
         except (ValueError, OSError, OverflowError):
             logger.warning("Invalid SOURCE_DATE_EPOCH %r — using wall clock", epoch)
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def _compute_config_hash(config_path: Path) -> str:
