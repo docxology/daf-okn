@@ -66,6 +66,74 @@ def test_wrong_graph_field_types_cannot_pass(artifacts, field, value):
     assert observation["graph"]["problems"]
 
 
+@pytest.mark.parametrize("field", ["id", "source", "target"])
+@pytest.mark.parametrize("value", [None, True, False, 0, 7, 1.5, [], {}])
+@pytest.mark.parametrize("with_report", [False, True])
+def test_non_string_identifiers_cannot_pass(tmp_path, capsys, field, value, with_report):
+    """Matching coerced endpoints and reports cannot bless a non-string identifier."""
+    identifier = str(value)
+    graph = GraphDocument(
+        name="identifier-probe",
+        nodes=[NodeRecord(identifier, "Coercible"), NodeRecord("peer", "Peer")],
+        edges=[
+            EdgeRecord("peer", identifier)
+            if field == "target"
+            else EdgeRecord(identifier, "peer")
+        ],
+    )
+    graph_path = graph.save_json(tmp_path / "graph.json")
+    report_path = Path(run_analysis(graph, tmp_path)["report_path"])
+    payload = json.loads(graph_path.read_text())
+    collection = "nodes" if field == "id" else "edges"
+    payload[collection][0][field] = value
+    graph_path.write_text(json.dumps(payload))
+    paths = (graph_path, report_path)
+    before = {path: (path.read_bytes(), path.stat().st_mtime_ns) for path in paths}
+    argv = ["status", "--graph", str(graph_path)]
+    if with_report:
+        argv.extend(["--report", str(report_path)])
+
+    code = main(argv)
+
+    observation = json.loads(capsys.readouterr().out)
+    assert code == 1
+    assert observation["status"] == "fail"
+    assert observation["graph"]["problems"]
+    assert observation["graph"]["sha256"] == hashlib.sha256(before[graph_path][0]).hexdigest()
+    assert observation["native_gate"] == "not_run"
+    assert observation["sidecar"] == observation["registry_acceptance"] == "not_checked"
+    if with_report:
+        assert observation["report"] == {
+            "path": str(report_path),
+            "sha256": None,
+            "problems": [],
+        }
+    else:
+        assert observation["report"] is None
+    assert {path: (path.read_bytes(), path.stat().st_mtime_ns) for path in paths} == before
+
+
+@pytest.mark.parametrize("collection", ["nodes", "edges"])
+@pytest.mark.parametrize("record", [None, False, 7, 1.5, "record", [], {}])
+def test_malformed_graph_records_fail_with_json_diagnostics(artifacts, capsys, collection, record):
+    """Non-object records and absent identifiers fail without assessing the report."""
+    graph, report = artifacts
+    payload = json.loads(graph.read_text())
+    payload[collection][0] = record
+    graph.write_text(json.dumps(payload))
+    before = {path: (path.read_bytes(), path.stat().st_mtime_ns) for path in artifacts}
+
+    code = main(["status", "--graph", str(graph), "--report", str(report)])
+
+    observation = json.loads(capsys.readouterr().out)
+    assert code == 1
+    assert observation["status"] == "fail"
+    assert observation["graph"]["problems"]
+    assert observation["graph"]["sha256"] == hashlib.sha256(before[graph][0]).hexdigest()
+    assert observation["report"] == {"path": str(report), "sha256": None, "problems": []}
+    assert {path: (path.read_bytes(), path.stat().st_mtime_ns) for path in artifacts} == before
+
+
 @pytest.mark.parametrize("field", ["graph_name", "stats", "problems", "metrics"])
 def test_report_mismatch_is_refused(artifacts, field):
     """Every measured report field must agree with current computation."""

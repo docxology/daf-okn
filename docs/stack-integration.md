@@ -20,6 +20,15 @@ and `compute_metrics`; it does not regenerate the report. The console entrypoint
 Missing arguments exit 2 through the existing parser. Requested evidence that
 cannot pass inspection exits 1; successful inspection exits 0.
 
+Graph inspection checks serialized records before `GraphDocument.from_dict`
+can coerce their values. Every node and edge must be an object; node `id` and
+edge `source`/`target` must be present strings. Null, boolean, numeric, list and
+object identifiers fail even when their string forms would match endpoints.
+Existing invariant checks still reject empty or duplicate IDs, dangling
+endpoints and self-loops. These type checks belong to artifact inspection;
+permissive graph loading elsewhere is unchanged. An invalid graph retains the
+digest of the original bytes and leaves any requested report unassessed.
+
 The `daf-okn.artifact-status/1` payload contains:
 
 | Field | Meaning |
@@ -127,10 +136,12 @@ An offline cache miss is an environment blocker, not a passing gate. On hosts
 with cached Python 3.12 packages, `UV_OFFLINE=1 UV_PYTHON=3.12 bash
 scripts/gate.sh` selects that runtime without changing the lock or gate profile.
 
-`tests/analysis/test_artifact_status.py` proves successful CLI inspection with
-unchanged inputs, then rejects missing/malformed inputs, invalid graph endpoints,
+`tests/analysis/test_artifact_status.py` covers successful CLI inspection with
+unchanged inputs, malformed nested records and non-string identifiers (including
+reports matching the coerced graph), missing/malformed inputs, invalid endpoints,
 altered report fields, boolean measurements and changed structure with unchanged
-node/edge counts. Live results belong in the handoff, not static count claims.
+node/edge counts. Rejected graph bytes retain their digest; requested reports stay
+unassessed. Live results belong in the handoff, not static count claims.
 
 Next, daf-stack/daf-operator can admit this existing console entrypoint as an
 artifact observation. Preserve the explicit unassessed fields. Independently
