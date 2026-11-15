@@ -87,9 +87,21 @@ def inspect_artifacts(graph_path: Path, report_path: Path | None = None) -> Arti
                 raise ValueError(f"graph {graph_path} missing required field {field!r}")
         if not isinstance(payload["name"], str):
             raise TypeError(f"graph name must be a string, got {payload['name']!r}")
-        for field in ("nodes", "edges"):
+        # WHY: model coercion must not turn malformed identifiers into evidence.
+        for field, identifiers in (("nodes", ("id",)), ("edges", ("source", "target"))):
             if not isinstance(payload[field], list):
                 raise TypeError(f"graph {field} must be a list, got {payload[field]!r}")
+            for index, record in enumerate(payload[field]):
+                if not isinstance(record, dict):
+                    raise TypeError(
+                        f"graph {field}[{index}] must be an object, got {record!r}"
+                    )
+                for identifier in identifiers:
+                    value = record.get(identifier)
+                    if not isinstance(value, str):
+                        raise TypeError(
+                            f"graph {field}[{index}].{identifier} must be a string, got {value!r}"
+                        )
         graph = GraphDocument.from_dict(payload)
         graph_observation["problems"] = validate_graph(graph)
     except (OSError, ValueError, TypeError, KeyError, UnicodeError) as error:
