@@ -235,7 +235,7 @@ print(report["metrics"]["node_count"], report["metrics"]["density"])
 
 ## Agent skill
 
-A Hermes/agentskills.io-compatible skill for this project lives at
+An agentskills.io-compatible skill for this project lives at
 [`.agents/skills/daf-okn/SKILL.md`](.agents/skills/daf-okn/SKILL.md).
 Load it when working inside this project to get when-to-use guidance,
 quick reference commands, and pitfalls.
