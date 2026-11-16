@@ -20,6 +20,8 @@ visualize, package) are covered by tests; the registry client is tested against 
 sessions and has not been run against every live OKN endpoint. Nothing here uploads to the
 registry for you: `package` writes files and prints the steps.
 
+![daf-okn Architecture Overview](docs/assets/architecture-overview.svg)
+
 ## Install
 
 Python 3.11 or newer is declared; CI runs the tests on 3.12, 3.14 and 3.15.

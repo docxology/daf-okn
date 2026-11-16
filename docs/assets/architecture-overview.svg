@@ -1,0 +1,104 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 650" width="1120" height="650" role="img" aria-labelledby="svg-title svg-desc">
+  <title id="svg-title">daf-okn Architecture Overview</title>
+  <desc id="svg-desc">Open Knowledge Network (OKN) registry pull, Obsidian vault export, structural graph analysis, cross-graph RDF join, visualization, and FRINK contribution pipeline.</desc>
+  <defs>
+    <marker id="arrow-slate" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 1.5 L 9 5 L 0 8.5 z" fill="#475569"/></marker>
+    <marker id="arrow-blue" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 1.5 L 9 5 L 0 8.5 z" fill="#2563eb"/></marker>
+    <marker id="arrow-teal" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 1.5 L 9 5 L 0 8.5 z" fill="#0d9488"/></marker>
+    <marker id="arrow-indigo" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 1.5 L 9 5 L 0 8.5 z" fill="#4f46e5"/></marker>
+    <marker id="arrow-amber" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 1.5 L 9 5 L 0 8.5 z" fill="#d97706"/></marker>
+    <marker id="arrow-emerald" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 1.5 L 9 5 L 0 8.5 z" fill="#059669"/></marker>
+    <marker id="arrow-rose" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 1.5 L 9 5 L 0 8.5 z" fill="#e11d48"/></marker>
+    <marker id="arrow-purple" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 1.5 L 9 5 L 0 8.5 z" fill="#7c3aed"/></marker>
+  </defs>
+  <rect x="4" y="4" width="1112" height="642" rx="16" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5"/>
+  <rect x="4" y="4" width="1112" height="68" rx="16" fill="#0f172a"/>
+  <rect x="4" y="56" width="1112" height="16" fill="#0f172a"/>
+  <line x1="4" y1="72" x2="1116" y2="72" stroke="#38bdf8" stroke-width="2.5"/>
+  <rect x="855" y="21" width="243" height="30" rx="15" fill="#1e293b" stroke="#38bdf8" stroke-width="1.2"/>
+  <text x="976.5" y="40.0" font-family="ui-monospace, 'SFMono-Regular', Menlo, Monaco, Consolas, monospace" font-size="11.5" font-weight="700" fill="#38bdf8" text-anchor="middle">Python 3.11–3.15 · ≥90% Branch</text>
+  <text x="26.0" y="32.0" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="18" font-weight="700" fill="#f8fafc" text-anchor="start">daf-okn v0.2.0 — Open Knowledge Network Graph &amp; RDF Pipeline</text>
+  <text x="26.0" y="54.0" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="500" fill="#cbd5e1" text-anchor="start">Pull, export, analyze, cross-graph join, visualize, and package knowledge graphs for RENCI / FRINK (okn.us)</text>
+  <rect x="20" y="88" width="346" height="366" rx="12" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.4"/>
+  <rect x="20" y="88" width="346" height="32" rx="12" fill="#2563eb" fill-opacity="0.10"/>
+  <line x1="20" y1="120" x2="366" y2="120" stroke="#2563eb" stroke-opacity="0.35" stroke-width="1"/>
+  <rect x="251" y="94" width="105" height="20" rx="6" fill="#2563eb" fill-opacity="0.16" stroke="#2563eb" stroke-width="0.8"/>
+  <text x="303.5" y="108.0" font-family="ui-monospace, 'SFMono-Regular', Menlo, Monaco, Consolas, monospace" font-size="11" font-weight="700" fill="#2563eb" text-anchor="middle">pull · export</text>
+  <text x="34.0" y="109.0" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="700" fill="#0f172a" text-anchor="start">1. Registry Pull &amp; Vault Export</text>
+  <rect x="36" y="132" width="314" height="104" rx="8" fill="#f8fafc" stroke="#2563eb" stroke-width="1.3"/>
+  <rect x="36" y="132" width="5" height="104" rx="2.5" fill="#2563eb"/>
+  <text x="50.0" y="152.0" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="700" fill="#0f172a" text-anchor="start">OKN Registry &amp; SPARQL (registry.py)</text>
+  <text x="50.0" y="170.0" font-family="ui-monospace, 'SFMono-Regular', Menlo, Monaco, Consolas, monospace" font-size="11.0" font-weight="500" fill="#334155" text-anchor="start">daf-okn pull (--kgs-path local or live)</text>
+  <text x="50.0" y="186.5" font-family="ui-monospace, 'SFMono-Regular', Menlo, Monaco, Consolas, monospace" font-size="11.0" font-weight="500" fill="#334155" text-anchor="start">Snapshots registry.okn.us catalog</text>
+  <text x="50.0" y="203.0" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="11.0" font-weight="500" fill="#334155" text-anchor="start">Executes federated SPARQL queries</text>
+  <text x="50.0" y="219.5" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="11.0" font-weight="500" fill="#334155" text-anchor="start">Zero import-time I/O invariant</text>
+  <rect x="36" y="250" width="314" height="104" rx="8" fill="#f8fafc" stroke="#0284c7" stroke-width="1.3"/>
+  <rect x="36" y="250" width="5" height="104" rx="2.5" fill="#0284c7"/>
+  <text x="50.0" y="270.0" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="700" fill="#0f172a" text-anchor="start">Markdown Vault Exporter</text>
+  <text x="50.0" y="288.0" font-family="ui-monospace, 'SFMono-Regular', Menlo, Monaco, Consolas, monospace" font-size="11.0" font-weight="500" fill="#334155" text-anchor="start">core/cognitive_adapter.py</text>
+  <text x="50.0" y="304.5" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="11.0" font-weight="500" fill="#334155" text-anchor="start">Parses Obsidian [[wikilinks]] &amp; YAML</text>
+  <text x="50.0" y="321.0" font-family="ui-monospace, 'SFMono-Regular', Menlo, Monaco, Consolas, monospace" font-size="11.0" font-weight="500" fill="#334155" text-anchor="start">Vault: AII cognitive knowledge base</text>
+  <text x="50.0" y="337.5" font-family="ui-monospace, 'SFMono-Regular', Menlo, Monaco, Consolas, monospace" font-size="11.0" font-weight="500" fill="#334155" text-anchor="start">Emits typed graph.json</text>
+  <rect x="36" y="368" width="314" height="70" rx="8" fill="#f8fafc" stroke="#475569" stroke-width="1.3"/>
+  <rect x="36" y="368" width="5" height="70" rx="2.5" fill="#475569"/>
+  <text x="50.0" y="388.0" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="700" fill="#0f172a" text-anchor="start">Graph Model &amp; Invariants</text>
+  <text x="50.0" y="406.0" font-family="ui-monospace, 'SFMono-Regular', Menlo, Monaco, Consolas, monospace" font-size="11.0" font-weight="500" fill="#334155" text-anchor="start">graph.py · invariants.py · keyword_terms</text>
+  <rect x="387" y="88" width="346" height="366" rx="12" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.4"/>
+  <rect x="387" y="88" width="346" height="32" rx="12" fill="#0d9488" fill-opacity="0.10"/>
+  <line x1="387" y1="120" x2="733" y2="120" stroke="#0d9488" stroke-opacity="0.35" stroke-width="1"/>
+  <rect x="612" y="94" width="111" height="20" rx="6" fill="#0d9488" fill-opacity="0.16" stroke="#0d9488" stroke-width="0.8"/>
+  <text x="667.5" y="108.0" font-family="ui-monospace, 'SFMono-Regular', Menlo, Monaco, Consolas, monospace" font-size="11" font-weight="700" fill="#0d9488" text-anchor="middle">analyze · join</text>
+  <text x="401.0" y="109.0" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="700" fill="#0f172a" text-anchor="start">2. Metrics &amp; Cross-Graph Join</text>
+  <rect x="403" y="132" width="314" height="104" rx="8" fill="#f8fafc" stroke="#0d9488" stroke-width="1.3"/>
+  <rect x="403" y="132" width="5" height="104" rx="2.5" fill="#0d9488"/>
+  <text x="417.0" y="152.0" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="700" fill="#0f172a" text-anchor="start">Structural Graph Pipeline</text>
+  <text x="417.0" y="170.0" font-family="ui-monospace, 'SFMono-Regular', Menlo, Monaco, Consolas, monospace" font-size="11.0" font-weight="500" fill="#334155" text-anchor="start">pipeline.py + graph_metrics.py</text>
+  <text x="417.0" y="186.5" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="11.0" font-weight="500" fill="#334155" text-anchor="start">Node/edge counts, density, WCC / SCC,</text>
+  <text x="417.0" y="203.0" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="11.0" font-weight="500" fill="#334155" text-anchor="start">mean degree, triangles &amp; top centrality</text>
+  <text x="417.0" y="219.5" font-family="ui-monospace, 'SFMono-Regular', Menlo, Monaco, Consolas, monospace" font-size="11.0" font-weight="500" fill="#334155" text-anchor="start">→ output/data/graph_report.json</text>
+  <rect x="403" y="250" width="314" height="104" rx="8" fill="#f8fafc" stroke="#059669" stroke-width="1.3"/>
+  <rect x="403" y="250" width="5" height="104" rx="2.5" fill="#059669"/>
+  <text x="417.0" y="270.0" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="700" fill="#0f172a" text-anchor="start">Canonical RDF Cross-Graph Join</text>
+  <text x="417.0" y="288.0" font-family="ui-monospace, 'SFMono-Regular', Menlo, Monaco, Consolas, monospace" font-size="11.0" font-weight="500" fill="#334155" text-anchor="start">cross_graph.py (daf-okn join)</text>
+  <text x="417.0" y="304.5" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="11.0" font-weight="500" fill="#334155" text-anchor="start">Deterministic capture &amp; offline replay</text>
+  <text x="417.0" y="321.0" font-family="ui-monospace, 'SFMono-Regular', Menlo, Monaco, Consolas, monospace" font-size="11.0" font-weight="500" fill="#334155" text-anchor="start">explain-join: assertion-path support</text>
+  <text x="417.0" y="337.5" font-family="ui-monospace, 'SFMono-Regular', Menlo, Monaco, Consolas, monospace" font-size="11.0" font-weight="500" fill="#334155" text-anchor="start">join_explanation + join_evidence.py</text>
+  <rect x="403" y="368" width="314" height="70" rx="8" fill="#f8fafc" stroke="#475569" stroke-width="1.3"/>
+  <rect x="403" y="368" width="5" height="70" rx="2.5" fill="#475569"/>
+  <text x="417.0" y="388.0" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="700" fill="#0f172a" text-anchor="start">Offline Evidence &amp; Stack Health</text>
+  <text x="417.0" y="406.0" font-family="ui-monospace, 'SFMono-Regular', Menlo, Monaco, Consolas, monospace" font-size="11.0" font-weight="500" fill="#334155" text-anchor="start">status · stack-health roster audit</text>
+  <rect x="754" y="88" width="346" height="366" rx="12" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.4"/>
+  <rect x="754" y="88" width="346" height="32" rx="12" fill="#7c3aed" fill-opacity="0.10"/>
+  <line x1="754" y1="120" x2="1100" y2="120" stroke="#7c3aed" stroke-opacity="0.35" stroke-width="1"/>
+  <rect x="985" y="94" width="105" height="20" rx="6" fill="#7c3aed" fill-opacity="0.16" stroke="#7c3aed" stroke-width="0.8"/>
+  <text x="1037.5" y="108.0" font-family="ui-monospace, 'SFMono-Regular', Menlo, Monaco, Consolas, monospace" font-size="11" font-weight="700" fill="#7c3aed" text-anchor="middle">viz · package</text>
+  <text x="768.0" y="109.0" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="700" fill="#0f172a" text-anchor="start">3. Visuals &amp; OKN Submission</text>
+  <rect x="770" y="132" width="314" height="104" rx="8" fill="#f8fafc" stroke="#7c3aed" stroke-width="1.3"/>
+  <rect x="770" y="132" width="5" height="104" rx="2.5" fill="#7c3aed"/>
+  <text x="784.0" y="152.0" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="700" fill="#0f172a" text-anchor="start">Network Figure &amp; HTML Dashboard</text>
+  <text x="784.0" y="170.0" font-family="ui-monospace, 'SFMono-Regular', Menlo, Monaco, Consolas, monospace" font-size="11.0" font-weight="500" fill="#334155" text-anchor="start">network_figure.py → network.png</text>
+  <text x="784.0" y="186.5" font-family="ui-monospace, 'SFMono-Regular', Menlo, Monaco, Consolas, monospace" font-size="11.0" font-weight="500" fill="#334155" text-anchor="start">dashboard/dashboard.py + payload.py</text>
+  <text x="784.0" y="203.0" font-family="ui-monospace, 'SFMono-Regular', Menlo, Monaco, Consolas, monospace" font-size="11.0" font-weight="500" fill="#334155" text-anchor="start">Self-contained static dashboard.html</text>
+  <text x="784.0" y="219.5" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="11.0" font-weight="500" fill="#334155" text-anchor="start">Manages {{TOKEN}} manuscript hydration</text>
+  <rect x="770" y="250" width="314" height="104" rx="8" fill="#f8fafc" stroke="#4f46e5" stroke-width="1.3"/>
+  <rect x="770" y="250" width="5" height="104" rx="2.5" fill="#4f46e5"/>
+  <text x="784.0" y="270.0" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="700" fill="#0f172a" text-anchor="start">FRINK / RENCI Contribution Bundle</text>
+  <text x="784.0" y="288.0" font-family="ui-monospace, 'SFMono-Regular', Menlo, Monaco, Consolas, monospace" font-size="11.0" font-weight="500" fill="#334155" text-anchor="start">core/contribute.py (daf-okn package)</text>
+  <text x="784.0" y="304.5" font-family="ui-monospace, 'SFMono-Regular', Menlo, Monaco, Consolas, monospace" font-size="11.0" font-weight="500" fill="#334155" text-anchor="start">core/rdf.py + rdf_submission.py</text>
+  <text x="784.0" y="321.0" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="11.0" font-weight="500" fill="#334155" text-anchor="start">Standard-vocab RDF + registry YAML</text>
+  <text x="784.0" y="337.5" font-family="ui-monospace, 'SFMono-Regular', Menlo, Monaco, Consolas, monospace" font-size="11.0" font-weight="500" fill="#334155" text-anchor="start">bundle-rdf byte-preserving audit</text>
+  <rect x="770" y="368" width="314" height="70" rx="8" fill="#f8fafc" stroke="#475569" stroke-width="1.3"/>
+  <rect x="770" y="368" width="5" height="70" rx="2.5" fill="#475569"/>
+  <text x="784.0" y="388.0" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="700" fill="#0f172a" text-anchor="start">Introspected Live API Docs</text>
+  <text x="784.0" y="406.0" font-family="ui-monospace, 'SFMono-Regular', Menlo, Monaco, Consolas, monospace" font-size="11.0" font-weight="500" fill="#334155" text-anchor="start">documentation.py → api_reference.md</text>
+  <path d="M 366.0 260.0 L 387.0 260.0" fill="none" stroke="#0d9488" stroke-width="1.8" marker-end="url(#arrow-teal)"/>
+  <path d="M 733.0 260.0 L 754.0 260.0" fill="none" stroke="#7c3aed" stroke-width="1.8" marker-end="url(#arrow-purple)"/>
+  <rect x="20" y="472" width="1080" height="124" rx="10" fill="#0f172a" stroke="#38bdf8" stroke-width="1.3"/>
+  <text x="34.0" y="492.0" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="700" fill="#38bdf8" text-anchor="start">Strict Unidirectional Layer Contract (docs/architecture.md)</text>
+  <text x="34.0" y="510.0" font-family="ui-monospace, 'SFMono-Regular', Menlo, Monaco, Consolas, monospace" font-size="11.0" font-weight="500" fill="#e2e8f0" text-anchor="start">• scripts/ &amp; src/daf_okn/cli.py (thin orchestrators) ──→ src/daf_okn/analysis/ ──→ src/daf_okn/core/ (pure logic)</text>
+  <text x="34.0" y="526.5" font-family="ui-monospace, 'SFMono-Regular', Menlo, Monaco, Consolas, monospace" font-size="11.0" font-weight="500" fill="#e2e8f0" text-anchor="start">• Allowed core runtime dependencies ONLY: Python stdlib · requests · networkx · rdflib · pyyaml</text>
+  <text x="34.0" y="543.0" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="11.0" font-weight="500" fill="#e2e8f0" text-anchor="start">• Offline safety: package &amp; bundle-rdf never auto-upload over the network; writes local artifacts + submission checklist</text>
+  <rect x="16" y="612" width="1088" height="28" rx="8" fill="#e2e8f0" stroke="#cbd5e1" stroke-width="1"/>
+  <text x="28.0" y="630.0" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="700" fill="#1e293b" text-anchor="start">CI Gates (Python 3.12 · 3.14 · 3.15): pytest --cov=src --cov-branch --cov-fail-under=90 · ruff check . · mypy -p daf_okn</text>
+  <text x="1092.0" y="630.0" font-family="ui-monospace, 'SFMono-Regular', Menlo, Monaco, Consolas, monospace" font-size="11.0" font-weight="500" fill="#334155" text-anchor="end">MIT License · docxology/daf-okn</text>
+</svg>
