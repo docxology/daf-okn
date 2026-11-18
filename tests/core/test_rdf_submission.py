@@ -248,6 +248,56 @@ def test_bundle_preserves_canonical_graph_and_verifies_actual_files(tmp_path):
     assert json.loads((out / "bundle.json").read_text())["source_dirty"] is True
 
 
+def test_bundle_accepts_a_canonical_export_outside_the_source_checkout(tmp_path):
+    root = source_repo(tmp_path)
+    export = (root / "output/okn").rename(tmp_path / "canonical-export")
+    bundle = tmp_path / "bundle"
+    submission.prepare(root, bundle, export=export)
+    assert (bundle / "cognitive-kb.nq").read_bytes() == (
+        export / "cognitive-kb.nq"
+    ).read_bytes()
+    assert submission.verify(bundle, root=root) == []
+
+
+def test_cli_rejects_symlinked_bundle_destination(tmp_path):
+    root = source_repo(tmp_path)
+    actual = tmp_path / "destination"
+    actual.mkdir()
+    alias = tmp_path / "alias"
+    alias.symlink_to(actual, target_is_directory=True)
+    assert (
+        main(["bundle-rdf", "--root", str(root), "--output", str(alias / "bundle")])
+        == 1
+    )
+    assert not (actual / "bundle").exists()
+
+
+def test_root_bound_verification_checks_the_copied_export_against_current_sources(
+    tmp_path,
+):
+    root = source_repo(tmp_path)
+    export = root / "output/okn"
+    bundle = tmp_path / "bundle"
+    submission.prepare(root, bundle)
+    assert submission.verify(bundle, root=root) == []
+
+    (root / "knowledge_base/example.md").write_text("# Revised example\n")
+    dataset = Dataset().parse(export / "cognitive-kb.nq", format="nquads")
+    graph = dataset.graph(URIRef(GRAPH))
+    graph.set(
+        (URIRef(GRAPH + "/page/example"), DCTERMS.title, Literal("Revised example"))
+    )
+    dataset.serialize(export / "cognitive-kb.nq", format="nquads")
+    graph.serialize(export / "cognitive-kb.ttl", format="turtle")
+    refresh_manifest(export)
+
+    assert submission.validate_export(export, root) == []
+    assert submission.verify(bundle) == []
+    assert submission.verify(bundle, root=root) == [
+        "source hash mismatch: knowledge_base/example.md"
+    ]
+
+
 @pytest.mark.parametrize(
     "failure",
     ["hash", "license", "scheme", "page_license", "manifest_license", "different_turtle", "empty"],

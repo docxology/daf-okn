@@ -247,11 +247,12 @@ def resolution_file_inventory(root: Path) -> set[str]:
     return names
 
 
-def prepare(root: Path, output: Path) -> None:
-    """Create a byte-preserving, validated bundle in a new directory."""
+def prepare(root: Path, output: Path, *, export: Path | None = None) -> None:
+    """Create a byte-preserving bundle from the canonical export of the given source."""
     if any(parent.is_symlink() for parent in (output, *output.absolute().parents)):
         raise SubmissionError(f"symlink is not a bundle destination: {output}")
-    export = root / "output/okn"
+    if export is None:
+        export = root / "output/okn"
     errors = validate_export(export, root)
     if errors:
         raise SubmissionError("; ".join(errors))
@@ -262,10 +263,20 @@ def prepare(root: Path, output: Path) -> None:
     ):
         regular_file(root, name)
     revision = subprocess.run(
-        ["git", "rev-parse", "HEAD"], cwd=root, check=True, capture_output=True, text=True
+        ["git", "rev-parse", "HEAD"],
+        cwd=root,
+        stdin=subprocess.DEVNULL,
+        check=True,
+        capture_output=True,
+        text=True,
     ).stdout.strip()
     dirty = subprocess.run(
-        ["git", "status", "--porcelain"], cwd=root, check=True, capture_output=True, text=True
+        ["git", "status", "--porcelain"],
+        cwd=root,
+        stdin=subprocess.DEVNULL,
+        check=True,
+        capture_output=True,
+        text=True,
     ).stdout.splitlines()
     output.mkdir(parents=True, exist_ok=False)
     for name in ("cognitive-kb.nq", "cognitive-kb.ttl", "manifest.json"):
@@ -341,7 +352,7 @@ def prepare(root: Path, output: Path) -> None:
     (output / "bundle.json").write_text(
         json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
-    errors = verify(output) + validate_export(export, root)
+    errors = verify(output, root=root)
     if errors:
         raise SubmissionError("; ".join(errors))
     print(f"Prepared {len(files)} submission files at {output}")
@@ -446,8 +457,8 @@ def validate_export(directory: Path, root: Path | None = None) -> list[str]:
     return errors
 
 
-def verify(output: Path) -> list[str]:
-    """Verify the complete bundle payload and revalidate its canonical RDF offline."""
+def verify(output: Path, *, root: Path | None = None) -> list[str]:
+    """Verify bundle contents, comparing the copied export to current sources if given."""
     try:
         manifest = json_object(
             read_bounded(regular_file(output, "bundle.json"), MAX_MANIFEST_BYTES)
@@ -474,6 +485,6 @@ def verify(output: Path) -> list[str]:
             or manifest.get("upload_object") != "s3://cognitive-kb/develop/cognitive-kb.nq"
         ):
             errors.append("invalid bundle provenance metadata")
-        return sorted(set(errors + validate_export(output)))
+        return sorted(set(errors + validate_export(output, root)))
     except (OSError, ValueError) as error:
         return [f"invalid bundle: {error}"]
