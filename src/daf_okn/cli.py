@@ -44,7 +44,7 @@ import yaml
 
 from . import __version__
 from .analysis import cross_graph
-from .core import rdf_submission
+from .core import lakefs_cognitive, rdf_submission
 from .core.contribute import add_package_arguments, run_package
 from .core.registry import OKNRegistry, RegistryError
 
@@ -86,10 +86,26 @@ def _cmd_explain_join(args: argparse.Namespace) -> int:
 
 def _cmd_bundle_rdf(args: argparse.Namespace) -> int:
     if args.check:
-        errors = rdf_submission.verify(args.output)
+        if args.export is not None:
+            raise ValueError("--export is used only when building a bundle")
+        errors = rdf_submission.verify(args.output, root=args.root)
         print(json.dumps({"bundle_verified": not errors, "errors": errors}, indent=2))
         return 1 if errors else 0
-    rdf_submission.prepare(args.root.resolve(), args.output.resolve())
+    rdf_submission.prepare(
+        (args.root or Path(".")).absolute(), args.output.absolute(), export=args.export
+    )
+    return 0
+
+
+def _cmd_lakefs_cognitive(args: argparse.Namespace) -> int:
+    receipt = lakefs_cognitive.run(
+        args.bundle,
+        args.config,
+        stage=args.stage,
+        commit=args.commit,
+        expected_develop=args.expected_develop,
+    )
+    print(json.dumps(receipt, indent=2))
     return 0
 
 
@@ -128,7 +144,11 @@ def _cmd_pull_query(args: argparse.Namespace) -> int:
 
 # --------------------------------------------------------------------------- export
 def _cmd_export(args: argparse.Namespace) -> int:
-    from .core.cognitive_adapter import default_graph_name, export_cognitive_kb, vault_root
+    from .core.cognitive_adapter import (
+        default_graph_name,
+        export_cognitive_kb,
+        vault_root,
+    )
 
     if not args.repo:
         raise SystemExit(f"error: --repo is required (or set ${COGNITIVE_REPO_ENV})")
@@ -235,7 +255,9 @@ def build_parser() -> argparse.ArgumentParser:
     query.add_argument("--shortname", required=True, help="registry shortname of the graph")
     query.add_argument("--sparql", required=True, help="SPARQL query text")
     query.add_argument(
-        "--out", type=Path, help="output JSON (default: output/data/<shortname>_query.json)"
+        "--out",
+        type=Path,
+        help="output JSON (default: output/data/<shortname>_query.json)",
     )
     query.set_defaults(func=_cmd_pull_query)
 
@@ -336,10 +358,23 @@ def build_parser() -> argparse.ArgumentParser:
     )
     explain.set_defaults(func=_cmd_explain_join)
     bundle = commands.add_parser("bundle-rdf", help="verify and package canonical cognitive RDF")
-    bundle.add_argument("--root", default=Path("."), type=Path)
+    bundle.add_argument("--root", type=Path, help="Cognitive checkout (default: . when building)")
+    bundle.add_argument("--export", type=Path, help="export directory (default: ROOT/output/okn)")
     bundle.add_argument("--output", required=True, type=Path)
     bundle.add_argument("--check", action="store_true")
     bundle.set_defaults(func=_cmd_bundle_rdf)
+    lakefs = commands.add_parser(
+        "lakefs-cognitive", help="verify or stage the canonical OKN object"
+    )
+    lakefs.add_argument("--bundle", required=True, type=Path)
+    lakefs.add_argument("--config", required=True, type=Path, help="private lakectl YAML file")
+    upload = lakefs.add_mutually_exclusive_group()
+    upload.add_argument(
+        "--stage", action="store_true", help="commit the verified object to develop"
+    )
+    upload.add_argument("--commit", help="verify the object at an immutable lakeFS commit")
+    lakefs.add_argument("--expected-develop", help="reviewed base commit for an object replacement")
+    lakefs.set_defaults(func=_cmd_lakefs_cognitive)
     status = commands.add_parser(
         "status", help="inspect existing graph/report evidence offline (JSON)"
     )
@@ -357,7 +392,10 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     health.add_argument(
-        "--roster", required=True, type=Path, help="roster JSON file, or - to read stdin"
+        "--roster",
+        required=True,
+        type=Path,
+        help="roster JSON file, or - to read stdin",
     )
     health.add_argument(
         "--member", default="daf-okn", help="roster member name (default: %(default)s)"

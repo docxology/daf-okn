@@ -17,8 +17,9 @@ Its flagship use is exporting the Active Inference Institute's
 
 **Status:** version 0.2.0, the first public release. The offline parts (export, analyze,
 visualize, package) are covered by tests; the registry client is tested against stubbed HTTP
-sessions and has not been run against every live OKN endpoint. Nothing here uploads to the
-registry for you: `package` writes files and prints the steps.
+sessions. `package` writes files and the contribution checklist. The separate
+`lakefs-cognitive` command verifies or stages the canonical RDF for the accepted
+`cognitive-kb` registry entry. See [the landing-zone workflow](docs/okn/cross-graph.md#stage-the-okn-object).
 
 ![daf-okn Architecture Overview](docs/assets/architecture-overview.svg)
 
@@ -71,6 +72,7 @@ See [canonical RDF and cross-graph workflows](docs/okn/cross-graph.md).
 | `daf-okn join --source FILE --query FILE --output DIR [--replay CAPTURE]` | Capture or replay the bounded cognitive-to-OBO assertion path. |
 | `daf-okn explain-join --source FILE --query FILE --capture DIR --output DIR [--check]` | Explain a verified schema-3 path with local review records and recorded remote bindings, offline. |
 | `daf-okn bundle-rdf --root COGNITIVE --output DIR [--check]` | Preserve and verify the canonical RDF and required review documentation. |
+| `daf-okn lakefs-cognitive --bundle DIR --config FILE` | Check the LakeFS handoff. Use `--stage` to commit the verified object to `develop` or `--commit ID` to verify a specific commit. |
 
 Run `daf-okn <command> --help` for every option. `pull` and live `join` use the network, and
 `--kgs-path` avoids it for `list` and `snapshot`. `DAF_OKN_COGNITIVE_REPO` is the default for

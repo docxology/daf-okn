@@ -129,13 +129,39 @@ New or missing pages require a fresh export. Offline bundle checks validate the
 recorded source inventory's structure; current source bytes and completeness
 require `validate_export(directory, root)` or a fresh `bundle-rdf --root` run.
 
-Only the canonical N-Quads object is intended for lakeFS upload. The manifest,
-documentation and captured remote responses are review evidence, not additional
-RDF inputs. Follow cognitive's landing-zone handoff for commit, merge, processing
-and deployment receipts. Package verification is not registry acceptance.
+## Stage the OKN object
+
+The [accepted registry entry](https://github.com/frink-okn/okn-registry/pull/535)
+identifies the `cognitive-kb` LakeFS repository. Only the canonical
+`cognitive-kb.nq` file goes into the landing zone. Keep the bundle and
+its review evidence in local storage.
+
+```bash
+daf-okn bundle-rdf --root "$COGNITIVE_ROOT" --output "$BUNDLE" --check
+daf-okn lakefs-cognitive --bundle "$BUNDLE" --config "$LAKECTL_CONFIG_FILE"
+daf-okn lakefs-cognitive --bundle "$BUNDLE" --config "$LAKECTL_CONFIG_FILE" --stage
+daf-okn lakefs-cognitive --bundle "$BUNDLE" --config "$LAKECTL_CONFIG_FILE" --commit "$LAKEFS_COMMIT"
+```
+
+Use an externally stored lakectl YAML file for the private credentials.
+The first LakeFS command reads `develop`; it returns `ready`, `already_present`,
+or `replacement_required`. Staging requires a bundle from a clean source checkout.
+For a replacement, review the observed base and supply it with
+`--expected-develop`. `--stage` verifies an isolated commit before cherry-picking
+its single object change onto `develop`. It checks the resulting parent diff
+and reads back the immutable commit's bytes to verify SHA-256. Keep the JSON
+receipt with the bundle. The receipt identifies the isolated staging branch.
+If the server outcome is uncertain, inspect the named branch and re-run the
+read-only check before attempting another stage.
+
+After staging, follow the [OKN update workflow](https://registry.okn.us/help/update/)
+for review, merge, processing and deployment. The accepted registry copy and
+older mapping/federation examples describe the prior RDF model. Coordinate the
+registry text and query updates using the current bundle before release.
 
 Implementation: `src/daf_okn/analysis/cross_graph.py`,
-`src/daf_okn/core/rdf_submission.py`, and `src/daf_okn/cli.py`.
+`src/daf_okn/core/rdf_submission.py`, `src/daf_okn/core/lakefs_cognitive.py`,
+and `src/daf_okn/cli.py`.
 Tests use real files, real local HTTP and SPARQL evaluation. No public endpoint is
 required by the offline suite.
 

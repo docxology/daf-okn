@@ -8,6 +8,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+from shlex import split
 
 import pytest
 import rdflib
@@ -349,6 +350,26 @@ def test_upload_commands_include_lakefs_endpoint_and_develop_branch(tmp_path: Pa
     s5cmd_commands = upload_commands("demo-repo", tmp_path / "dataset", tool="s5cmd")
     assert any("https://repository.okn.us/" in command for command in s5cmd_commands)
     assert any("develop" in command for command in s5cmd_commands)
+
+
+@pytest.mark.parametrize(
+    ("tool", "scheme"), [("rclone", "lakefs:"), ("s5cmd", "s3://")]
+)
+def test_upload_commands_quote_source_and_destination(tool: str, scheme: str) -> None:
+    config = upload_commands(
+        "demo-repo",
+        Path("-research & review") / "data set",
+        endpoint="https://repository.okn.us/?probe=$ignored",
+        tool=tool,
+    )
+    assert split(config[3]) == [
+        "export",
+        "LAKEFS_ENDPOINT=https://repository.okn.us/?probe=$ignored",
+    ]
+    assert split(config[-1])[-2:] == [
+        "./-research & review/data set",
+        f"{scheme}demo-repo/develop/data set",
+    ]
 
 
 def test_upload_commands_rejects_unknown_tool(tmp_path: Path) -> None:
@@ -813,7 +834,7 @@ def test_main_upload_commands_prints_rclone_by_default(tmp_path: Path, capsys) -
     captured = capsys.readouterr()
     assert exit_code == 0
     lines = captured.out.splitlines()
-    assert lines[0].startswith("export AWS_ACCESS_KEY_ID=")
+    assert "export AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY" in lines
     assert any("rclone copy" in line for line in lines)
     assert any("lakefs:demo-repo/develop/dataset" in line for line in lines)
 
@@ -836,5 +857,5 @@ def test_main_upload_commands_supports_s5cmd(tmp_path: Path, capsys) -> None:
     captured = capsys.readouterr()
     assert exit_code == 0
     lines = captured.out.splitlines()
-    assert any("s5cmd --endpoint-url $LAKEFS_ENDPOINT cp" in line for line in lines)
+    assert any('s5cmd --endpoint-url "$LAKEFS_ENDPOINT" cp' in line for line in lines)
     assert any("s3://demo-repo/main/dataset" in line for line in lines)

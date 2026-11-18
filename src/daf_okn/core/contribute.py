@@ -21,6 +21,7 @@ import json
 import re
 from collections.abc import Iterable
 from pathlib import Path
+from shlex import quote
 from typing import Any
 
 import yaml
@@ -207,11 +208,14 @@ def upload_commands(
     """
 
     source = local_dir.as_posix()
-    target_name = local_dir.name or "dataset"
+    if source.startswith("-"):
+        source = "./" + source
+    target = f"{repo}/{branch}/{local_dir.name or 'dataset'}"
     credentials = [
-        "export AWS_ACCESS_KEY_ID=<your-access-key-id>",
-        "export AWS_SECRET_ACCESS_KEY=<your-secret-access-key>",
-        f"export LAKEFS_ENDPOINT={endpoint}",
+        ': "${AWS_ACCESS_KEY_ID:?Set AWS_ACCESS_KEY_ID for lakeFS}"',
+        ': "${AWS_SECRET_ACCESS_KEY:?Set AWS_SECRET_ACCESS_KEY for lakeFS}"',
+        "export AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY",
+        f"export LAKEFS_ENDPOINT={quote(endpoint)}",
     ]
     if tool == "rclone":
         return [
@@ -219,14 +223,13 @@ def upload_commands(
             "# Configure a lakeFS-compatible S3 remote named lakefs "
             "(storage type 5 / S3, then 31 / Other) with endpoint $LAKEFS_ENDPOINT.",
             "# The OKN docs recommend no parallelization for large uploads.",
-            f"rclone copy --transfers 1 --checkers 1 {source} lakefs:{repo}/{branch}/{target_name}",
+            f"rclone copy --transfers 1 --checkers 1 {quote(source)} {quote('lakefs:' + target)}",
         ]
     if tool == "s5cmd":
         return [
             *credentials,
-            "# Use s5cmd with --endpoint-url $LAKEFS_ENDPOINT; the docs recommend S3 clients "
-            "for files greater than 1G and no parallelization.",
-            f"s5cmd --endpoint-url $LAKEFS_ENDPOINT cp {source} s3://{repo}/{branch}/{target_name}",
+            "# The OKN docs recommend serial transfers for large uploads.",
+            f's5cmd --endpoint-url "$LAKEFS_ENDPOINT" cp {quote(source)} {quote("s3://" + target)}',
         ]
     raise ValueError(f"Unsupported upload tool: {tool!r}")
 
