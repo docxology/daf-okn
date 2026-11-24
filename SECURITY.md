@@ -7,5 +7,8 @@ daniel@activeinference.institute rather than opening a public issue. Include the
 You can expect an acknowledgement within a week. Only the latest release is supported.
 
 daf-okn reads local files and talks to public OKN endpoints (okn.us, registry.okn.us,
-apps.okn.us). It never needs credentials; the lakeFS upload commands it prints contain
-placeholders for your own keys, which you should keep out of version control.
+apps.okn.us). Pulling registry data needs no credentials. The optional `lakefs-cognitive`
+command reads a lakectl configuration file that you supply, which holds your lakeFS access
+keys. The tool uses those keys only to authenticate its requests to the OKN lakeFS endpoint
+and does not store or log them. Keep that file, and the keys in the upload commands the tool
+prints, out of version control.
