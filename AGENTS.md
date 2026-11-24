@@ -6,8 +6,8 @@ analyzing and visualizing knowledge graphs, and contributing back — including
 exporting the Active Inference Institute `cognitive` knowledge graph to the
 registry.
 
-The research experiment is "graph-analysis": pull the OKN registry catalog
-(45 graphs), export a knowledge base (cognitive vault case study) to a typed
+The research experiment is "graph-analysis": pull the OKN registry catalog,
+export a knowledge base (cognitive vault case study) to a typed
 graph, measure structure, visualize, and package a validated registry
 contribution.
 
@@ -40,7 +40,7 @@ controls for verifier-like gates.
 
 The `daf-okn` console script (also `python -m daf_okn`) exposes the pipeline as
 subcommands: `pull` (`list`, `snapshot` (also accepted as `save-snapshot`), `query`),
-`analyze`, `bundle-rdf`, `export`, `explain-join`, `join`, `package`,
+`analyze`, `bundle-rdf`, `export`, `explain-join`, `join`, `lakefs-cognitive`, `package`,
 `stack-health`, `status`, and `visualize`. `package` writes the registry entry to
 `<out>/registry/docs/registry/kgs/<shortname>.md`. The scripts under
 `scripts/` remain thin wrappers over the same `src/daf_okn` functions.
