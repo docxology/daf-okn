@@ -72,7 +72,7 @@ See [canonical RDF and cross-graph workflows](docs/okn/cross-graph.md).
 | `daf-okn join --source FILE --query FILE --output DIR [--replay CAPTURE]` | Capture or replay the bounded cognitive-to-OBO assertion path. |
 | `daf-okn explain-join --source FILE --query FILE --capture DIR --output DIR [--check]` | Explain a verified schema-3 path with local review records and recorded remote bindings, offline. |
 | `daf-okn bundle-rdf --root COGNITIVE --output DIR [--check]` | Preserve and verify the canonical RDF and required review documentation. |
-| `daf-okn lakefs-cognitive --bundle DIR --config FILE` | Check the LakeFS handoff. Use `--stage` to commit the verified object to `develop` or `--commit ID` to verify a specific commit. |
+| `daf-okn lakefs-cognitive --bundle DIR --config FILE [--expected-develop COMMIT]` | Check the LakeFS handoff. Use `--stage` to commit the verified object to `develop` (`--expected-develop` pins the reviewed base commit when replacing an object) or `--commit ID` to verify a specific commit. |
 
 Run `daf-okn <command> --help` for every option. `pull` and live `join` use the network, and
 `--kgs-path` avoids it for `list` and `snapshot`. `DAF_OKN_COGNITIVE_REPO` is the default for
@@ -181,9 +181,14 @@ rather than dropped.
 | `core/cognitive_adapter.py` | Markdown vault to `GraphDocument`. |
 | `core/keyword_terms.py` | Reviewed external subject terms, exact source-tag lookup and provenance validation. |
 | `core/rdf.py` | `GraphDocument` to RDF with standard vocabularies (`graph_to_rdf`, `build_rdf_graph`). |
+| `core/alignment.py` | Validate source-reviewed SKOS mappings without network I/O. |
+| `core/join_evidence.py` | Pure assertion-path projection over replay-verified, semantically validated inputs. |
+| `core/join_report.py` | Pure Markdown rendering for captured cross-graph join results. |
+| `core/lakefs_cognitive.py` | Stage the validated canonical Cognitive KB object for OKN review. |
+| `core/rdf_submission.py` | Prepare and verify a provenance-recorded cognitive-kb submission directory. |
 | `core/contribute.py` | Registry entry, checklist, upload commands, contribution package. |
 | `core/manuscript_variables.py`, `core/documentation.py`, `core/project_paths.py` | Support for the research manuscript and generated API reference. |
-| `analysis/` | `compute_metrics`, `run_analysis`. |
+| `analysis/` | `compute_metrics`, `run_analysis`; `cross_graph.py` (capture and replay joins from cognitive-kb through two named OKN graphs), `join_explanation.py` (verified offline explanations, published separately from immutable captures), `artifact_status.py` (read-only graph-validity and report-consistency observations). |
 | `figures/`, `dashboard/` | Network figure, registry catalog chart, static HTML dashboard. |
 
 Library use:
@@ -211,6 +216,7 @@ project whose numbers are filled in from pipeline output
 pip install -e ".[dev]"
 pytest -q --cov=src --cov-branch --cov-fail-under=90
 ruff check .
+mypy -p daf_okn
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md). Tests use real data and no live network requests.

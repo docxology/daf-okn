@@ -108,7 +108,7 @@ Smoke tests invoke real commands and assert real output files appear. See [`test
 
 ### 00_preflight.py
 
-Environment check: Python ≥ 3.10; dependency imports (`yaml`, `requests`, `networkx`, `rdflib`, `matplotlib`, `daf_okn.core.graph`, `daf_okn.core.registry`, `daf_okn.analysis.pipeline`); `manuscript/config.yaml` parses. Exits nonzero with actionable diagnostics on failure. Not pipeline-required.
+Environment check: Python ≥ 3.11; dependency imports (`yaml`, `requests`, `networkx`, `rdflib`, `matplotlib`, `daf_okn.core.graph`, `daf_okn.core.registry`, `daf_okn.analysis.pipeline`); `manuscript/config.yaml` parses. Exits nonzero with actionable diagnostics on failure. Not pipeline-required.
 
 ### pull_registry.py
 

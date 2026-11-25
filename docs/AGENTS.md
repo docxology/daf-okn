@@ -22,7 +22,7 @@ Technical guide for `docs/` — the operational rulebook for AI agents and devel
 | `forking_guide.md` | Fork workflow, required-vs-aesthetic, friction-point table | ~120 | Comprehensive |
 | `rendering_pipeline.md` | Research workflow → manuscript variables; rendering notes; config.yaml controls; troubleshooting | ~120 | Comprehensive |
 | `style_guide.md` | 7 rules: Zero-Mock, Module Layering, Thin Orchestrator, Show-Not-Tell, Explicit Paths, Type Hints, Error Messages | ~190 | Comprehensive |
-| `syntax_guide.md` | Markdown links, LaTeX refs, all 21 `{{VARIABLE}}` tokens, figure label registry, adding variables/figures | ~200 | Comprehensive |
+| `syntax_guide.md` | Markdown links, LaTeX refs, all `{{VARIABLE}}` tokens, figure label registry, adding variables/figures | ~200 | Comprehensive |
 
 ## Key Conventions
 

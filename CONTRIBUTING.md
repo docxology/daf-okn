@@ -8,6 +8,7 @@ python -m venv .venv && . .venv/bin/activate
 pip install -e ".[dev]"
 pytest -q --cov=src --cov-branch --cov-fail-under=90   # tests, with the coverage gate
 ruff check .                                            # lint (ruff is in the dev extra)
+mypy -p daf_okn                                         # type check (mypy is in the dev extra)
 ```
 
 ## Ground rules
