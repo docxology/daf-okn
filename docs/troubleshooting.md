@@ -166,7 +166,7 @@ uv run python -c "import yaml; yaml.safe_load(open('manuscript/config.yaml'))"
 
 ## Preflight failures (`00_preflight.py` exits 1)
 
-**Cause.** The preflight script checks Python ≥ 3.10, required dependency
+**Cause.** The preflight script checks Python ≥ 3.11, required dependency
 imports (`yaml`, `requests`, `networkx`, `rdflib`, `matplotlib`, plus
 `daf_okn.core.graph`/`registry` and `daf_okn.analysis.pipeline`), and that
 `manuscript/config.yaml` parses.

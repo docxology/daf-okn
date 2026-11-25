@@ -23,8 +23,13 @@ controls for verifier-like gates.
 | `core/registry.py` | `OKNRegistry`: list/get graphs over `kgs.yaml`, per-graph/federation SPARQL, TPF fragments, VoID endpoints, embeddings; `RegistryError` on HTTP ≥ 400; no I/O at import; injected `requests.Session` | `scripts/pull_registry.py` |
 | `core/invariants.py` | `validate_graph` (empty/duplicate ids, dangling endpoints, self-loops) and `graph_stats` | — |
 | `core/cognitive_adapter.py` | Obsidian-vault parser: `parse_frontmatter`, wiki links, semantic relations, `build_cognitive_graph`, `export_cognitive_kb` | `scripts/export_cognitive.py` |
+| `core/alignment.py` | Validates source-reviewed SKOS mappings without network I/O | — |
+| `core/join_evidence.py` | Pure assertion-path projection over replay-verified, semantically validated inputs | — |
+| `core/join_report.py` | Pure Markdown rendering for captured cross-graph join results | `daf-okn join` |
+| `core/lakefs_cognitive.py` | Stages the validated canonical Cognitive KB object for OKN review (`--stage`, `--commit`, `--expected-develop`) | `daf-okn lakefs-cognitive` |
+| `core/rdf_submission.py` | Prepares and verifies a provenance-recorded cognitive-kb submission directory | `daf-okn bundle-rdf` |
 | `core/rdf.py` | `graph_to_rdf` / `build_rdf_graph`: RDF with SKOS/DCTERMS/schema.org terms; entity IRIs under `https://purl.org/okn/frink/kg/<shortname>/`, named graph `https://purl.org/okn/frink/kg/<shortname>`; custom relations become `<base>relation/<name>` sub-properties of `skos:semanticRelation`; other attributes under `<base>vocab/`; sorted, byte-stable N-Triples/N-Quads | `daf-okn package` |
-| `cli.py` | `daf-okn` / `python -m daf_okn`: `pull`, `export`, `analyze`, `visualize`, `package`, `join`, `explain-join`, `bundle-rdf`, `status` | `daf-okn --help` |
+| `cli.py` | `daf-okn` / `python -m daf_okn`: `pull`, `export`, `analyze`, `visualize`, `package`, `join`, `explain-join`, `bundle-rdf`, `lakefs-cognitive`, `stack-health`, `status` | `daf-okn --help` |
 | `core/contribute.py` | `registry_entry` (frontmatter limited to the registry's documented fields; never `sparql`/`tpf`), `contribution_checklist`, `upload_commands`, `validate_package` (writes `<shortname>.<fmt>`, `registry/docs/registry/kgs/<shortname>.md`, `checklist.md`), `PRESET_ENTRIES`, `register_graph` CLI | `scripts/register_graph.py` |
 | `core/manuscript_variables.py` | `generate_variables(config_path, require_analysis_outputs=True)` → flat `{{TOKEN}}` map from `manuscript/config.yaml` + `output/data/graph_report.json`; `--allow-draft` → `"N/A"` sentinels | `scripts/z_generate_manuscript_variables.py` |
 | `core/documentation.py` | `build_api_reference_markdown()` — introspection over the real modules; no static template | `scripts/generate_api_docs.py` |
@@ -32,6 +37,9 @@ controls for verifier-like gates.
 | `core/stack_roster.py` | Offline consumer of the `daf-stack-doctor roster` JSON: `parse_roster`, `check_member`, `read_branch`; no gate execution, no writes, no network | `daf-okn stack-health` |
 | `core/_runtime.py` | `get_logger`, `save_figure_data` | — |
 | `analysis/graph_metrics.py` | `compute_metrics`: node/edge counts, density, connectivity, mean degree, triangles, degree/betweenness centrality, top central nodes; helpers for degree sequences and edge scores | — |
+| `analysis/cross_graph.py` | Captures and replays joins from cognitive-kb through two named OKN graphs | `daf-okn join` |
+| `analysis/join_explanation.py` | Verified offline explanations, published separately from immutable captures | `daf-okn explain-join` |
+| `analysis/artifact_status.py` | Read-only observations of graph validity and analysis report consistency | `daf-okn status` |
 | `analysis/pipeline.py` | `run_analysis(graph, out_dir)` → `graph_report.json` (`REPORT_FILENAME`); `FileNotFoundError` in pipeline mode when the report is missing | `scripts/analyze_graph.py` |
 | `figures/network_figure.py` | `plot_network` (spring/circular/kamada_kawai/random), `network_figure_bytes`, `plot_graph_catalog` | used by `scripts/10_research_workflow.py` |
 | `dashboard/` | `build_dashboard_html` (static HTML from graph + metrics payload), `cli_main` | `scripts/build_dashboard.py` |

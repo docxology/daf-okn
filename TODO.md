@@ -6,7 +6,7 @@ This view records no independent task state. Preserve blocked and completed reco
 
 Native contracts: [AGENTS.md](AGENTS.md). Task and gate signposts:
 [public/links.toml](.docxology/public/links.toml). Resolve ecosystem members from
-`daf_stack.manifest.default_manifest()`; Flywheel proposals and Horizon previews
+`daf_stack.manifest.default_manifest()`; Factory proposals and Horizon previews
 remain subject to Operator policy, source freshness and separate execution admission.
 
 - [daf-okn-stack-onboarding](tasks.yaml#L5) — Verify the offline package gate for stack onboarding
@@ -59,9 +59,10 @@ Open limitations carried into the backlog:
 - **Per-graph embeddings weighting** — weight connector-search keywords by
   per-graph embeddings quality/availability instead of uniform ranking in
   `output/data/connector_search/results.json`.
-- **LakeFS credentialed upload** — wire `core/contribute.py::upload_commands`
-  to the versioned store at `repository.okn.us` with credentials; record
-  upload receipts.
+- **LakeFS credentialed upload** — `daf-okn lakefs-cognitive --stage` already
+  commits the verified canonical object to `develop`; remaining work is wiring
+  `core/contribute.py::upload_commands` to the versioned store at
+  `repository.okn.us` with credentials and recording upload receipts.
 - **Upstream-format tracking** — upstream registry entry metadata schema is
   "not enforced upstream; treat fields as conventional" ([NOT DOCUMENTED]
   formal schema); track upstream format changes and validate our

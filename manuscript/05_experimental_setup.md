@@ -18,7 +18,7 @@ This section documents the configuration and the execution order that produced t
 | Platform | {{PLATFORM}} |
 | Generated | {{GENERATION_TIMESTAMP}} |
 
-Python version floor is 3.10 (`pyproject.toml`); `scripts/00_preflight.py` verifies the full dependency stack (pyyaml, requests, networkx, rdflib, matplotlib) and config parseability before the pipeline runs.
+Python version floor is 3.11 (`pyproject.toml`); `scripts/00_preflight.py` verifies the full dependency stack (pyyaml, requests, networkx, rdflib, matplotlib) and config parseability before the pipeline runs.
 
 ## Workflow ordering
 

@@ -19,7 +19,7 @@ ls -la ../output/
 
 | Script | Purpose | Inputs | Outputs |
 | --- | --- | --- | --- |
-| `00_preflight.py` | Environment check (Python ≥ 3.10, deps, `config.yaml` parses) | — | actionable preflight diagnostics |
+| `00_preflight.py` | Environment check (Python ≥ 3.11, deps, `config.yaml` parses) | — | actionable preflight diagnostics |
 | `pull_registry.py` | List/snapshot registry catalog; per-graph/federation SPARQL | network or `--kgs-path` | `kgs.yaml` snapshot, query results |
 | `export_cognitive.py` | Cognitive vault → typed graph | `--repo` / `$DAF_OKN_COGNITIVE_REPO` | `output/data/cognitive_kg.json` |
 | `analyze_graph.py` | Structural metrics + report | GraphDocument JSON | `output/analysis/graph_report.json` |
