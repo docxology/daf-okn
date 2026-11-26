@@ -79,16 +79,22 @@ defaults to the current directory. The `daf-okn.stack-roster/1` payload holds:
 | `native_gate` | Always `not_run` |
 
 Treat roster inputs and observation output as local data. The output includes
-absolute checkout paths and can include paths or a command supplied by the
-roster. Use synthetic data in public examples and uploaded test artifacts.
+absolute checkout paths and can include other paths supplied by the roster.
+Use synthetic data in public examples and uploaded test artifacts.
 
 The checks are `path` (the roster names this checkout), `branch`,
 `required_files` (each declared checkout-relative path exists), `gate` (a
-declared `gate_cmd` whose relative paths exist), `board` (the roster's
+declared `gate_cmd` with an explicit script checked when possible), `board` (the roster's
 `board_path`, which must stay inside the checkout, or `<checkout>/tasks.yaml`,
 when `require_board`), and `sidecar` (`.docxology/manifest.toml` when
 `require_sidecar`). Scoping `board_path` to the checkout keeps a mismatched
 checkout from passing the board check on another tree's file.
+
+The gate check verifies a literal checkout-relative script in one simple
+command, including scripts passed to `bash`, `sh`, `python` or `python3`.
+Leading environment assignments and later command arguments do not add
+checkout file requirements. Other forms, including compound commands,
+report the script path as unverified and preserve `native_gate: not_run`.
 
 Exit 0 when every declared requirement holds, 1 for a failing member or an
 unreadable/malformed roster, 2 for missing arguments. No command is executed,

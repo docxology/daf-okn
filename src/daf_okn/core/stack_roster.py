@@ -14,6 +14,7 @@ requirements hold for these bytes on disk", never "the gate passed".
 from __future__ import annotations
 
 import json
+import re
 import shlex
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
@@ -306,33 +307,63 @@ def _files_check(entry: RosterEntry, checkout: Path) -> MemberCheck:
     return {"name": "required_files", "ok": not missing, "detail": detail}
 
 
+def _gate_script(tokens: list[str]) -> PurePosixPath | None:
+    """Select a literal script from one recognizable command invocation."""
+    if any(re.fullmatch(r"[();<>|&]+", token) for token in tokens):
+        return None
+    index = 0
+    while index < len(tokens) and re.match(r"[A-Za-z_][A-Za-z0-9_]*=", tokens[index]):
+        index += 1
+    if index == len(tokens):
+        return None
+    program = tokens[index]
+    if program in {"bash", "sh", "python", "python3"}:
+        if index + 1 == len(tokens):
+            return None
+        script = tokens[index + 1]
+    elif "/" in program:
+        script = program
+    else:
+        return None
+    if script.startswith(("/", "-")) or not re.fullmatch(r"[A-Za-z0-9_./-]+", script):
+        return None
+    path = PurePosixPath(script)
+    if not path.parts or ".." in path.parts:
+        return None
+    return path
+
+
 def _gate_check(entry: RosterEntry, checkout: Path) -> MemberCheck:
     if entry.gate_cmd is None:
         return {"name": "gate", "ok": False, "detail": "roster declares no gate_cmd"}
     try:
-        tokens = shlex.split(entry.gate_cmd)
+        lexer = shlex.shlex(entry.gate_cmd, posix=True, punctuation_chars=True)
+        lexer.whitespace_split = True
+        tokens = list(lexer)
     except ValueError as error:
         return {"name": "gate", "ok": False, "detail": f"gate_cmd is not shell-parseable: {error}"}
-    # Only path-shaped tokens are checked; a bare command name (pytest, uv) has
-    # nothing to resolve against the checkout without executing it.
-    relative = [token for token in tokens if "/" in token and not token.startswith("-")]
-    if not relative:
+    script = None if "\n" in entry.gate_cmd else _gate_script(tokens)
+    if script is None:
         return {
             "name": "gate",
             "ok": True,
-            "detail": f"declared {entry.gate_cmd!r}; no checkout-relative path to check",
+            "detail": "gate is declared; checkout script path unverified",
         }
-    missing = [token for token in relative if not (checkout / token).exists()]
-    if missing:
+    try:
+        target = (checkout / script).resolve()
+        present = target.is_relative_to(checkout) and target.is_file()
+    except (OSError, RuntimeError):
+        present = False
+    if not present:
         return {
             "name": "gate",
             "ok": False,
-            "detail": f"gate_cmd names missing path(s): {', '.join(missing)}",
+            "detail": f"missing checkout script: {script}",
         }
     return {
         "name": "gate",
         "ok": True,
-        "detail": f"declared {entry.gate_cmd!r}; present: {', '.join(relative)}",
+        "detail": f"checkout script is present: {script}",
     }
 
 
@@ -378,10 +409,10 @@ def check_member(entry: RosterEntry, checkout: Path) -> StackHealth:
 
     Every declared requirement produces one check: ``path`` (the roster names
     this checkout), ``branch`` (the Git ``HEAD`` names the expected branch),
-    ``required_files``, ``gate`` (a declared command whose relative paths
-    exist), ``board`` and ``sidecar``. A declared ``board_path`` must stay
-    inside the checkout, so a mismatched checkout cannot borrow another tree's
-    board.
+    ``required_files``, ``gate`` (a declared command with a checked script when
+    its path is explicit), ``board`` and ``sidecar``. A declared ``board_path``
+    must stay inside the checkout, so a mismatched checkout cannot borrow
+    another tree's board.
 
     Args:
         entry: Member entry obtained from :func:`parse_roster`.
