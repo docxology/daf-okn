@@ -4,9 +4,9 @@ type: "manuscript_guide"
 version: "0.2.0"
 ---
 
-# Manuscript (`manuscript/`)
+# Manuscript (`docs/manuscript/`)
 
-Repository-wide agent rules for this project live in [`../docs/agent_instructions.md`](../docs/agent_instructions.md). This file covers **manuscript-specific** editing: file roles, the `{{TOKEN}}` protocol, the figure protocol, and the section modification workflow.
+Repository-wide agent rules for this project live in [`../agent_instructions.md`](../agent_instructions.md). This file covers **manuscript-specific** editing: file roles, the `{{TOKEN}}` protocol, the figure protocol, and the section modification workflow.
 
 ## File Inventory
 
@@ -35,9 +35,9 @@ Numeric values that come from analysis outputs **must** use `{{TOKEN}}` syntax (
 
 **The token pipeline**:
 1. `scripts/10_research_workflow.py` runs pull → export → analyze → visualize and writes `output/data/graph_report.json`
-2. `scripts/z_generate_manuscript_variables.py` calls `src/daf_okn/core/manuscript_variables.py::generate_variables()` (reads `manuscript/config.yaml` + the graph report; pipeline mode requires the report, `--allow-draft` substitutes `N/A` sentinels)
+2. `scripts/z_generate_manuscript_variables.py` calls `src/daf_okn/core/manuscript_variables.py::generate_variables()` (reads `docs/manuscript/config.yaml` + the graph report; pipeline mode requires the report, `--allow-draft` substitutes `N/A` sentinels)
 3. The script writes the full `{TOKEN: value}` mapping to `output/data/manuscript_variables.json`
-4. `write_resolved_manuscript()` writes copies of the chapters with every `{{TOKEN}}` substituted to `output/manuscript/` (a token missing from the map stays visible and is reported; documentation files are not copied); rendering those copies to PDF/HTML is left to your own Markdown/Pandoc toolchain
+4. `write_resolved_manuscript()` writes copies of the chapters with every `{{TOKEN}}` substituted to `output/manuscript/` (a token missing from the map stays visible and is reported; documentation files are not copied). Render those copies following the [rendering guide](../rendering_pipeline.md)
 
 **Adding a new token**:
 1. Emit it from `generate_variables()` in `src/daf_okn/core/manuscript_variables.py`
@@ -63,7 +63,7 @@ Both figures are referenced via Pandoc-crossref `[@fig:label]`, never hardcoded 
 
 **To add a new figure**:
 1. Add a generator function to `src/daf_okn/figures/` and wire it through the workflow's `visualize` stage (`scripts/10_research_workflow.py`) so the workflow produces the PNG.
-2. Add a Pandoc image line (alt text, relative path under `../output/figures/`, `{#fig:…}` anchor) in the appropriate chapter, following `03_results.md`.
+2. Add a Pandoc image line (alt text, relative path under `../../output/figures/`, `{#fig:…}` anchor) in the appropriate chapter, following `03_results.md`.
 3. Reference in prose: `[@fig:new_label]` (parenthetical) or `@fig:new_label` (narrative).
 4. Update the registry tables in [`SYNTAX.md`](SYNTAX.md) and this file.
 
@@ -86,7 +86,7 @@ Follow these steps in order whenever analysis behavior changes:
    ```bash
    uv run pytest tests/core/test_manuscript_variables.py -q
    ```
-5. **Render** the resolved chapters in `output/manuscript/` with your own Markdown/Pandoc toolchain. This repository ships no renderer.
+5. **Render** the resolved chapters in `output/manuscript/` with the [pinned template](../rendering_pipeline.md).
 6. **Verify figures and tables** appear in the rendered output and no literal `{{TOKEN}}` text remains.
 
 > **Mermaid note.** If a chapter embeds a ```mermaid``` block, rendering it as an image needs a Mermaid-aware step in your own toolchain.
@@ -95,14 +95,14 @@ Follow these steps in order whenever analysis behavior changes:
 
 1. Avoid boilerplate closers such as "In summary" / "In conclusion" at the end of sections unless the section genuinely needs them.
 2. Figures and numbers in `03_results.md` must match what the workflow wrote (paths under `output/figures/`, the `graph_report.json` schema).
-3. **Zero fabrication**: never write a result number in prose; use tokens. Where the OKN docs are silent, say so (see [`../docs/okn/api-notes.md`](../docs/okn/api-notes.md)) rather than filling the gap.
+3. **Zero fabrication**: never write a result number in prose; use tokens. Where the OKN docs are silent, say so (see [`../okn/api-notes.md`](../okn/api-notes.md)) rather than filling the gap.
 4. When referencing code, prefer concrete paths: `src/daf_okn/core/registry.py`, `scripts/10_research_workflow.py`.
 
 ## See also
 
 - [`README.md`](README.md) — Quick orientation
 - [`SYNTAX.md`](SYNTAX.md) — Pandoc syntax, equation/figure registries, token table
-- [`../docs/rendering_pipeline.md`](../docs/rendering_pipeline.md) — Manuscript variables and rendering notes
-- [`../docs/syntax_guide.md`](../docs/syntax_guide.md) — Complete `{{TOKEN}}` protocol
-- [`../src/daf_okn/core/manuscript_variables.py`](../src/daf_okn/core/manuscript_variables.py) — Variable computation logic (`generate_variables()`)
-- [`../scripts/z_generate_manuscript_variables.py`](../scripts/z_generate_manuscript_variables.py) — Thin orchestrator for the variable map
+- [`../rendering_pipeline.md`](../rendering_pipeline.md) — Manuscript variables and rendering notes
+- [`../syntax_guide.md`](../syntax_guide.md) — Complete `{{TOKEN}}` protocol
+- [`../../src/daf_okn/core/manuscript_variables.py`](../../src/daf_okn/core/manuscript_variables.py) — Variable computation logic (`generate_variables()`)
+- [`../../scripts/z_generate_manuscript_variables.py`](../../scripts/z_generate_manuscript_variables.py) — Thin orchestrator for the variable map

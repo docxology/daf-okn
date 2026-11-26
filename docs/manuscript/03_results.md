@@ -4,15 +4,15 @@ This section reports the pipeline run whose artifacts this manuscript hydrates f
 
 ## Registry catalog
 
-Stage 1 of the workflow (`pull_registry`) snapshots the OKN registry's `kgs.yaml` catalog to `output/data/registry_snapshot.yaml`. The catalog is the pull/analyze/visualize surface for all 45 registered graphs — each entry carries the graph's `shortname`, human title, description, per-graph SPARQL and TPF endpoint URLs, VoID stats link, funding and contact fields, and LakeFS/frink options. [@fig:registry_catalog] renders the catalog as one horizontal bar per registered graph (`plot_graph_catalog`, from `scripts/10_research_workflow.py` stage 4); the per-graph endpoints themselves are consumed by the SPARQL/TPF clients described in [@sec:methodology], and the connector-search stage (`scripts/08_connector_search.py`) matches the manuscript's keywords — {{CONFIG_KEYWORDS}} — against the embeddings service across all hosted graphs.
+Stage 1 of the workflow (`pull_registry`) snapshots the OKN registry's `kgs.yaml` catalog to `output/data/registry_snapshot.yaml`. The catalog is the pull/analyze/visualize surface for the graphs present in the captured snapshot — each entry carries the graph's `shortname`, human title, description, per-graph SPARQL and TPF endpoint URLs, VoID stats link, funding and contact fields, and LakeFS/frink options. [@fig:registry_catalog] renders the catalog as one horizontal bar per registered graph (`plot_graph_catalog`, from `scripts/10_research_workflow.py` stage 4); the per-graph endpoints themselves are consumed by the SPARQL/TPF clients described in [@sec:methodology], and the connector-search stage (`scripts/08_connector_search.py`) matches the manuscript's keywords — {{CONFIG_KEYWORDS}} — against the embeddings service across all hosted graphs.
 
-![The OKN registry catalog: one bar per registered knowledge graph, from the `kgs.yaml` snapshot written by the `pull_registry` stage.](../output/figures/registry_catalog.png){#fig:registry_catalog width=95%}
+![The OKN registry catalog: one bar per registered knowledge graph, from the `kgs.yaml` snapshot written by the `pull_registry` stage.](../../output/figures/registry_catalog.png){#fig:registry_catalog width=95%}
 
 ## Case study: the cognitive knowledge graph
 
 The case-study graph is the Active Inference Institute `cognitive` knowledge base, exported by stage 2 of the workflow (`export_cognitive_kb`) to `output/data/cognitive_kg.json`. The vault's markdown pages become typed nodes (frontmatter titles, `semantic_relations` and wiki-link edges, redirects collapsed or explicit), and the resulting document is measured by stage 3 (`run_analysis`) into `output/data/graph_report.json`.
 
-![Spring-layout rendering of the exported cognitive knowledge graph (`plot_network`), positioned deterministically; node color follows the document's node types.](../output/figures/cognitive_network.png){#fig:cognitive_network width=95%}
+![Spring-layout rendering of the exported cognitive knowledge graph (`plot_network`), positioned deterministically; node color follows the document's node types.](../../output/figures/cognitive_network.png){#fig:cognitive_network width=95%}
 
 [@fig:cognitive_network] renders the analyzed graph. Its structural summary is [@tbl:graph_metrics]; the report's `problems` block — the `validate_graph` invariants — must be empty for the run to gate the build.
 
@@ -39,4 +39,4 @@ Stage 4 packages the analyzed graph for the registry: `validate_package` writes 
 
 ## What the chain establishes
 
-The run demonstrates the full loop this paper claims: registry catalog pulled (45 graphs), a real knowledge base exported to the typed model, structure measured into a stable report schema, two deterministic figures rendered, and a contribution package validated and hashed. Nothing in the chain depends on hand-transcribed numbers: replacing the exported graph with any other `GraphDocument` JSON (for example, one converted from a SPARQL result via `bindings_to_graph`) re-runs identically and regenerates every token in this section.
+The run demonstrates the full loop this paper claims: registry catalog captured, a real knowledge base exported to the typed model, structure measured into a stable report schema, two deterministic figures rendered, and a contribution package validated and hashed. Nothing in the chain depends on hand-transcribed numbers: replacing the exported graph with any other `GraphDocument` JSON (for example, one converted from a SPARQL result via `bindings_to_graph`) re-runs identically and regenerates every token in this section.

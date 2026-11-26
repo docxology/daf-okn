@@ -65,13 +65,13 @@ or malformed responses.
 
 `scripts/z_generate_manuscript_variables.py` calls
 `src/daf_okn/core/manuscript_variables.py::generate_variables()`, which reads
-`manuscript/config.yaml` and `output/data/graph_report.json` and builds the
+`docs/manuscript/config.yaml` and `output/data/graph_report.json` and builds the
 flat `{{TOKEN}}` map (`NODE_COUNT`, `EDGE_COUNT`, `DENSITY_PCT`,
 `WEAKLY_CONNECTED_COMPONENTS`, `STRONGLY_CONNECTED_COMPONENTS`,
 `MEAN_DEGREE`, `TRIANGLE_COUNT`, `TOP_NODE_LABEL`,
 `TOP_NODE_CENTRALITY`, `GRAPH_NAME`, plus config and environment tokens).
 The map is written to `output/data/manuscript_variables.json`; substitute it
-into `manuscript/*.md` with your own rendering toolchain — no hardcoded numbers
+into copies of `docs/manuscript/*.md` in `output/manuscript/` so no hardcoded numbers
 in prose.
 
 ### Does the pipeline need network access?
@@ -116,8 +116,8 @@ the manuscript without hard-coding. They keep the prose synchronized
 with the analysis outputs. The variable generator
 (`scripts/z_generate_manuscript_variables.py`) reads `config.yaml` and
 `output/data/graph_report.json`, and writes a `{TOKEN: value}` dictionary to
-`output/data/manuscript_variables.json`. Substituting the tokens into the
-chapters is left to your rendering toolchain.
+`output/data/manuscript_variables.json`. The same command substitutes the
+tokens into the generated chapters in `output/manuscript/`.
 
 See [`syntax_guide.md`](syntax_guide.md) for the canonical token list.
 
@@ -127,8 +127,8 @@ See [`troubleshooting.md`](troubleshooting.md#literal-token_name-appears-in-the-
 
 ### Does this repository render a PDF?
 
-No. It produces the variables JSON, the resolved chapters and the figures; PDF/HTML rendering is left
-to whatever Markdown/Pandoc toolchain you use.
+DAF-OKN produces the variables JSON, resolved chapters, and figures. The
+[pinned template renderer](rendering_pipeline.md) builds the PDF and HTML.
 
 ## Common pitfalls
 
@@ -157,4 +157,4 @@ cognitive repo/graph is configured — that skip is by design, not a failure.
 - [`troubleshooting.md`](troubleshooting.md) — symptom-driven recipes.
 - [`output_conventions.md`](output_conventions.md) — output regeneration rules.
 - [`syntax_guide.md`](syntax_guide.md) — Pandoc-crossref syntax and token list.
-- [`../manuscript/AGENTS.md`](../manuscript/AGENTS.md) — token protocol and figure list.
+- [`manuscript/AGENTS.md`](manuscript/AGENTS.md) — token protocol and figure list.

@@ -24,7 +24,7 @@ ls -la ../output/
 | `export_cognitive.py` | Cognitive vault → typed graph | `--repo` / `$DAF_OKN_COGNITIVE_REPO` | `output/data/cognitive_kg.json` |
 | `analyze_graph.py` | Structural metrics + report | GraphDocument JSON | `output/analysis/graph_report.json` |
 | `10_research_workflow.py` | Chains pull → export → analyze → visualize in-process | `--cognitive-repo` / `--graph` | snapshot, kg JSON, report, 2 PNGs |
-| `08_connector_search.py` | Keyword connector search via registry embeddings | network, `manuscript/config.yaml` keywords | `output/data/connector_search/results.json` |
+| `08_connector_search.py` | Keyword connector search via registry embeddings | network, `docs/manuscript/config.yaml` keywords | `output/data/connector_search/results.json` |
 | `09_provenance_record.py` | Validate + package registry contribution | GraphDocument JSON | `output/data/provenance/` (N-Quads, entry, checklist, SHA-256 record) |
 | `register_graph.py` | Contribution packaging CLI (`core/contribute.main`) | GraphDocument JSON | contribution package |
 | `build_dashboard.py` | Static HTML dashboard from a graph | GraphDocument JSON | `output/web/dashboard.html` |

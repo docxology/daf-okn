@@ -8,7 +8,7 @@ The project-relative `output/` directory holds all generated artifacts from the 
 
 **Key principle:** The source of truth for all outputs is the combination of:
 - `src/daf_okn/analysis/pipeline.py` (graph analysis → `graph_report.json`)
-- `manuscript/config.yaml` (experiment parameters)
+- `docs/manuscript/config.yaml` (experiment parameters)
 - `scripts/10_research_workflow.py` (registry → export → analysis → figures)
 - `scripts/z_generate_manuscript_variables.py` (manuscript variable map)
 
@@ -60,7 +60,7 @@ inventory and the canonical RDF upload object. See the
 | `output/data/connector_search/results.json` | `scripts/08_connector_search.py` | connector review |
 | `output/data/provenance/{package/,registry/,checklist.md,provenance_record.json}` | `scripts/09_provenance_record.py` (via `core/contribute.py`) | registry submission |
 | `output/data/manuscript_variables.json` | `scripts/z_generate_manuscript_variables.py` | token substitution, debugging |
-| `output/manuscript/*.md` | `scripts/z_generate_manuscript_variables.py` | your Markdown/Pandoc rendering step |
+| `output/manuscript/*.md` | `scripts/z_generate_manuscript_variables.py` | pinned template render stage |
 | `output/web/dashboard.html` | `scripts/build_dashboard.py` (via `dashboard/`) | human review |
 | `output/docs/api_reference.md` | `scripts/generate_api_docs.py` (via `core/documentation.py`) | agent reference |
 
@@ -103,7 +103,7 @@ If any artifact becomes corrupted or you change the analysis, follow this sequen
    ```
    **Outputs**: `web/dashboard.html`
 
-6. **Render (outside this repository)** — produce PDF/HTML from the resolved chapters in `output/manuscript/` with your own Markdown/Pandoc toolchain (see [`rendering_pipeline.md`](rendering_pipeline.md)).
+6. **Render (outside this repository)** — produce PDF/HTML from the resolved chapters in `output/manuscript/` with the [pinned template renderer](rendering_pipeline.md).
 
 ## Version-Control Policy
 
@@ -133,6 +133,6 @@ To add a new figure or data product:
 
 ## See Also
 
-- [`manuscript/AGENTS.md`](../manuscript/AGENTS.md) — Manuscript modification protocol and token system
+- [`docs/manuscript/AGENTS.md`](manuscript/AGENTS.md) — Manuscript modification protocol and token system
 - [`rendering_pipeline.md`](rendering_pipeline.md) — Manuscript variables and rendering notes
 - [`syntax_guide.md`](syntax_guide.md) — Figure references and `{{VARIABLE}}` syntax

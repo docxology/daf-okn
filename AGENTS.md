@@ -31,7 +31,7 @@ controls for verifier-like gates.
 | `core/rdf.py` | `graph_to_rdf` / `build_rdf_graph`: RDF with SKOS/DCTERMS/schema.org terms; entity IRIs under `https://purl.org/okn/frink/kg/<shortname>/`, named graph `https://purl.org/okn/frink/kg/<shortname>`; custom relations become `<base>relation/<name>` sub-properties of `skos:semanticRelation`; other attributes under `<base>vocab/`; sorted, byte-stable N-Triples/N-Quads | `daf-okn package` |
 | `cli.py` | `daf-okn` / `python -m daf_okn`: `pull`, `export`, `analyze`, `visualize`, `package`, `join`, `explain-join`, `bundle-rdf`, `lakefs-cognitive`, `stack-health`, `status` | `daf-okn --help` |
 | `core/contribute.py` | `registry_entry` (frontmatter limited to the registry's documented fields; never `sparql`/`tpf`), `contribution_checklist`, `upload_commands`, `validate_package` (writes `<shortname>.<fmt>`, `registry/docs/registry/kgs/<shortname>.md`, `checklist.md`), `PRESET_ENTRIES`, `register_graph` CLI | `scripts/register_graph.py` |
-| `core/manuscript_variables.py` | `generate_variables(config_path, require_analysis_outputs=True)` → flat `{{TOKEN}}` map from `manuscript/config.yaml` + `output/data/graph_report.json`; `--allow-draft` → `"N/A"` sentinels | `scripts/z_generate_manuscript_variables.py` |
+| `core/manuscript_variables.py` | `generate_variables(config_path, require_analysis_outputs=True)` → flat `{{TOKEN}}` map from `docs/manuscript/config.yaml` + `output/data/graph_report.json`; `--allow-draft` → `"N/A"` sentinels | `scripts/z_generate_manuscript_variables.py` |
 | `core/documentation.py` | `build_api_reference_markdown()` — introspection over the real modules; no static template | `scripts/generate_api_docs.py` |
 | `core/project_paths.py` | `resolve_project_root`, `project_root_context`, `project_output_dirs` | — |
 | `core/stack_roster.py` | Offline consumer of the `daf-stack-doctor roster` JSON: `parse_roster`, `check_member`, `read_branch`; no gate execution, no writes, no network | `daf-okn stack-health` |
@@ -92,7 +92,7 @@ uv run pytest tests/ --cov=src --cov-fail-under=90
 
 ## Configuration
 
-Configuration lives in `pyproject.toml`, `manuscript/config.yaml` (paper
+Configuration lives in `pyproject.toml`, `docs/manuscript/config.yaml` (paper
 metadata read by `core/manuscript_variables.py`), and environment variables. Advisory agentic-research controls
 are declarative: `domain_profile.yaml` declares review gates, source policy,
 artifact expectations, and benchmark rubric preferences;
@@ -111,7 +111,7 @@ flowchart TB
     P --> SC[scripts<br/>Thin command-line wrappers]
     P --> T[tests]
     P --> DOCS[docs<br/>Documentation hub · okn/ registry docs]
-    P --> M[manuscript]
+    DOCS --> M[manuscript]
     P --> OUT[output<br/>Generated artifacts · regenerated]
     P --> PY[pyproject.toml<br/>Dependencies · pytest/coverage config]
     P --> DP[domain_profile.yaml · experiment_plan.yaml ·<br/>data/claim_ledger.yaml<br/>advisory controls · evidence validation]
@@ -259,7 +259,7 @@ quick reference commands, and pitfalls.
 
 ## See Also
 
-- [`manuscript/SYNTAX.md`](manuscript/SYNTAX.md) — Pandoc
+- [`docs/manuscript/SYNTAX.md`](docs/manuscript/SYNTAX.md) — Pandoc
   citation/cross-reference syntax for this project
 - [`README.md`](README.md) — project overview
 - OKN: <https://okn.us/> · Registry: <https://registry.okn.us/>

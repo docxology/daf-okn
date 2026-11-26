@@ -10,7 +10,7 @@ The same functionality is available through the `daf-okn` console script (also `
 
 - **Thin Orchestrator Pattern**: Scripts act as glue. They compose functions from `src/`, coordinate pipeline stages, and write `output/` artifacts — never graph logic, metric math, or RDF serialization themselves.
 - **Self-contained**: each script depends only on `src/daf_okn` and the declared project dependencies.
-- **Alphabetical ordering hints (`y_*`, `z_*`)**: scripts whose filenames start with a letter prefix run **after** any plainly-named script (alphabetical order). `z_generate_manuscript_variables.py` consumes `output/data/graph_report.json` and `manuscript/config.yaml` and writes the `{{TOKEN}}` map to `output/data/manuscript_variables.json` — so it must run after analysis. The alphabetical prefix is a human-readable hint for manual invocation; there is no pipeline runner, so run the scripts in the order you need.
+- **Alphabetical ordering hints (`y_*`, `z_*`)**: scripts whose filenames start with a letter prefix run **after** any plainly-named script (alphabetical order). `z_generate_manuscript_variables.py` consumes `output/data/graph_report.json` and `docs/manuscript/config.yaml` and writes the `{{TOKEN}}` map to `output/data/manuscript_variables.json` — so it must run after analysis. The alphabetical prefix is a human-readable hint for manual invocation; there is no pipeline runner, so run the scripts in the order you need.
 - **`z_generate_manuscript_variables.py` strict mode**: default invocation calls `generate_variables(..., require_analysis_outputs=True)` and fails with `FileNotFoundError` when `output/data/graph_report.json` is absent. Use `--allow-draft` for early manuscript drafts that intentionally use `"N/A"` sentinels.
 
 ## Directory Structure
@@ -87,7 +87,7 @@ Scripts read their parameters from project sources, not hardcoded grids:
 
 - **Registry catalog**: `kgs.yaml` (45 graph entries: shortname, title, description, sparql, tpf, stats, funding, contact, frink-options); `--kgs-path` reads a local snapshot offline
 - **Cognitive repo**: `--cognitive-repo` / `$DAF_OKN_COGNITIVE_REPO`
-- **Manuscript parameters**: `manuscript/config.yaml` (parsed by `00_preflight.py` and consumed by variable hydration)
+- **Manuscript parameters**: `docs/manuscript/config.yaml` (parsed by `00_preflight.py` and consumed by variable hydration)
 - **Output directories**: `output/data/`, `output/figures/`, `output/web/`, `output/docs/`, `output/data/provenance/`
 
 ## Testing
@@ -108,7 +108,7 @@ Smoke tests invoke real commands and assert real output files appear. See [`test
 
 ### 00_preflight.py
 
-Environment check: Python ≥ 3.11; dependency imports (`yaml`, `requests`, `networkx`, `rdflib`, `matplotlib`, `daf_okn.core.graph`, `daf_okn.core.registry`, `daf_okn.analysis.pipeline`); `manuscript/config.yaml` parses. Exits nonzero with actionable diagnostics on failure. Not pipeline-required.
+Environment check: Python ≥ 3.11; dependency imports (`yaml`, `requests`, `networkx`, `rdflib`, `matplotlib`, `daf_okn.core.graph`, `daf_okn.core.registry`, `daf_okn.analysis.pipeline`); `docs/manuscript/config.yaml` parses. Exits nonzero with actionable diagnostics on failure. Not pipeline-required.
 
 ### pull_registry.py
 
@@ -128,7 +128,7 @@ Opt-in research-workflow chain: `pull_registry` → `export_cognitive` → `anal
 
 ### 08_connector_search.py
 
-Enumerates the registry graph list via `OKNRegistry`, then runs `manuscript/config.yaml` keywords through the embeddings service (`POST https://apps.okn.us/embeddings/query`) → `output/data/connector_search/results.json`. Needs network. Flags: `--kgs-path`, `--keywords`, `--limit`, `--out`.
+Enumerates the registry graph list via `OKNRegistry`, then runs `docs/manuscript/config.yaml` keywords through the embeddings service (`POST https://apps.okn.us/embeddings/query`) → `output/data/connector_search/results.json`. Needs network. Flags: `--kgs-path`, `--keywords`, `--limit`, `--out`.
 
 ### 09_provenance_record.py
 

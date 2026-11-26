@@ -1,0 +1,12 @@
+{
+  "fig:registry_catalog": {
+    "filename": "registry_catalog.png",
+    "generated_by": "scripts/10_research_workflow.py",
+    "alt_text": "Horizontal bar chart with one row for each graph in the captured OKN registry catalog."
+  },
+  "fig:cognitive_network": {
+    "filename": "cognitive_network.png",
+    "generated_by": "scripts/10_research_workflow.py",
+    "alt_text": "Spring-layout diagram of the exported Cognitive Knowledge Base. Node colors distinguish the types in the graph document."
+  }
+}

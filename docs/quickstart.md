@@ -16,7 +16,8 @@ git clone https://github.com/docxology/daf-okn.git
 cd daf-okn
 
 # 2. Install dependencies at the repository root
-uv sync
+export UV_PYTHON=3.14
+uv sync --locked --extra dev
 
 # 3. Verify installation
 uv run python scripts/00_preflight.py
@@ -28,7 +29,7 @@ Validate the environment and check that the project test suite passes with the â
 Falling below that floor fails the gate outright (`--cov-fail-under` enforces it), and zero-collected suites fail too rather than counting as a pass.
 
 ```bash
-uv run pytest tests/ -v --tb=short
+bash scripts/gate.sh
 ```
 
 Expected: passing tests and coverage above the 90% gate. Report live counts with
@@ -36,10 +37,10 @@ Expected: passing tests and coverage above the 90% gate. Report live counts with
 
 ## Run the Research Workflow
 
-Pull the OKN registry catalog, export the cognitive knowledge base, analyze the graph, and produce figures:
+Pull the OKN registry catalog, export the cognitive knowledge base, analyze the graph, and produce figures. Set `cognitive_vault` to the path of a checkout of [ActiveInferenceInstitute/cognitive](https://github.com/ActiveInferenceInstitute/cognitive). The command supplies the SciPy dependency used by NetworkX for large network layouts.
 
 ```bash
-uv run python scripts/10_research_workflow.py --cognitive-repo <vault>
+uv run --locked --with scipy==1.17.1 python scripts/10_research_workflow.py --cognitive-repo "$cognitive_vault"
 ```
 
 **Outputs created under `output/`:**
@@ -72,8 +73,7 @@ uv run python scripts/z_generate_manuscript_variables.py
 Strict hydration requires `output/data/graph_report.json`; add `--allow-draft`
 for early drafts (`"N/A"` sentinels). The results are
 `output/data/manuscript_variables.json` and the resolved chapters in
-`output/manuscript/`; rendering to PDF/HTML is left to your
-own Markdown/Pandoc toolchain (see [`rendering_pipeline.md`](rendering_pipeline.md)).
+`output/manuscript/`. Follow the [rendering guide](rendering_pipeline.md) to build PDF and HTML.
 
 ## View Results
 
@@ -85,7 +85,7 @@ own Markdown/Pandoc toolchain (see [`rendering_pipeline.md`](rendering_pipeline.
 
 - **Analyze a different graph**: run `uv run python scripts/analyze_graph.py --graph <graph.json> --out-dir output/analysis`.
 - **Query a graph**: use `scripts/pull_registry.py` (catalog snapshot, per-graph/federation SPARQL) or `OKNRegistry` directly (see `docs/architecture.md`).
-- **Modify the manuscript**: edit markdown files under `manuscript/`, then regenerate the variables (step above) and re-render with your own toolchain.
+- **Modify the manuscript**: edit markdown files under `docs/manuscript/`, then regenerate the variables (step above) and follow the [rendering guide](rendering_pipeline.md).
 
 ## Getting Help
 
@@ -103,11 +103,11 @@ own Markdown/Pandoc toolchain (see [`rendering_pipeline.md`](rendering_pipeline.
 | Pull registry snapshot / SPARQL | `uv run python scripts/pull_registry.py` |
 | Export cognitive vault | `uv run python scripts/export_cognitive.py --repo <vault>` |
 | Analyze a graph | `uv run python scripts/analyze_graph.py --graph <graph.json>` |
-| Full research workflow | `uv run python scripts/10_research_workflow.py --cognitive-repo <vault>` |
+| Full research workflow | `uv run --locked --with scipy==1.17.1 python scripts/10_research_workflow.py --cognitive-repo <vault>` |
 | Package contribution | `uv run python scripts/09_provenance_record.py --graph <graph.json>` |
 | Connector search (network) | `uv run python scripts/08_connector_search.py` |
 | Generate manuscript variables | `uv run python scripts/z_generate_manuscript_variables.py` (strict; requires `graph_report.json`; add `--allow-draft` for early drafts) |
 | Build dashboard | `uv run python scripts/build_dashboard.py --graph <graph.json>` |
 | Generate API docs | `uv run python scripts/generate_api_docs.py` |
-| Render PDF/HTML | Not provided here; use your own Markdown/Pandoc toolchain (see [`rendering_pipeline.md`](rendering_pipeline.md)) |
+| Render PDF/HTML | [Pinned template render and validation](rendering_pipeline.md#render-and-validate-with-the-pinned-template) |
 | Clean outputs | `rm -rf output/` |

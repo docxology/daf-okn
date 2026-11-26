@@ -108,4 +108,4 @@ Follow these five steps in order:
 
 4. **Update output conventions** — Document the new output file in `docs/output_conventions.md`; generated `output/` files stay untracked.
 
-5. **Update manuscript section** — Edit the relevant `manuscript/` section with the description using concrete file paths (e.g., `src/daf_okn/analysis/graph_metrics.py::compute_metrics()`); add any result variables to `src/daf_okn/core/manuscript_variables.py::generate_variables()`; reference figures with `[@fig:label]` (Pandoc-crossref — see `docs/syntax_guide.md`).
+5. **Update manuscript section** — Edit the relevant `docs/manuscript/` section with the description using concrete file paths (e.g., `src/daf_okn/analysis/graph_metrics.py::compute_metrics()`); add any result variables to `src/daf_okn/core/manuscript_variables.py::generate_variables()`; reference figures with `[@fig:label]` (Pandoc-crossref — see `docs/syntax_guide.md`).

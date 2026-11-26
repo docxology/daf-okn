@@ -197,7 +197,7 @@ and `docs/okn/api-notes.md`):
 def generate_variables(config_path: Path, *, require_analysis_outputs: bool = True) -> dict[str, str]:
     """Build the flat ``UPPERCASE_KEY -> value`` map for ``{{TOKEN}}`` injection.
 
-    Reads manuscript/config.yaml (CONFIG_* tokens) and output/data/graph_report.json
+    Reads docs/manuscript/config.yaml (CONFIG_* tokens) and output/data/graph_report.json
     (graph-metric tokens). Pipeline mode (default) raises FileNotFoundError when the
     report is missing; --allow-draft substitutes explicit "N/A" sentinels.
     """
@@ -261,7 +261,7 @@ Shared runtime helpers for `src/` modules: `project_root(caller)`, `get_logger`,
 
 The package reads no experiment configuration: graph data comes from the registry
 pull (`kgs.yaml` snapshot) or exported knowledge-base JSON. Manuscript tokens are
-listed in the `variables:` block of [`manuscript/config.yaml`](../../manuscript/config.yaml)
+listed in the `variables:` block of [`docs/manuscript/config.yaml`](../../docs/manuscript/config.yaml)
 and produced by `core/manuscript_variables.py::generate_variables()`.
 
 ## Troubleshooting

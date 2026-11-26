@@ -1,12 +1,13 @@
 # docs/ — Project Documentation
 
-> **Operational rulebook** for the daf-okn project
+Use the [quickstart](quickstart.md) to install daf-okn, verify the checkout, and
+run the research workflow. The [artifact inventory](output_inventory.md) maps
+generated files to their producers.
 
-**Quick Reference:** [Agent Instructions](agent_instructions.md) | [Architecture](architecture.md) | [Testing](testing_philosophy.md) | [Rendering](rendering_pipeline.md) | [Style](style_guide.md) | [Syntax](syntax_guide.md) | [Index](AGENTS.md)
-
-## Purpose
-
-The `docs/` directory contains the behavioral and architectural rules that govern modifications to the daf-okn project. Every document here is a hard constraint — not a suggestion. The authoritative file index (including this `README.md` and `AGENTS.md`) lives in [`AGENTS.md`](AGENTS.md).
+- [OKN registry guides](okn/INDEX.md) cover the registry APIs, graph methods, and contribution.
+- [Manuscript source](manuscript/README.md) lists the ordered sections, configuration, and bibliography.
+- [Rendering guide](rendering_pipeline.md) covers evidence generation, hydration, and PDF/HTML validation.
+- [Standalone guide](standalone.md) records publication metadata and post-fork changes.
 
 ## Contents
 
@@ -55,7 +56,7 @@ new project — they are what the repo's gates enforce:
 | Thin-orchestrator: `scripts/` only I/O + orchestration, logic in `src/daf_okn/` | [`architecture.md`](architecture.md), [`style_guide.md`](style_guide.md) | code review |
 | Zero mocks: real data, `tmp_path`, injected session stubs | [`testing_philosophy.md`](testing_philosophy.md) | `grep -rn "unittest.mock\|MagicMock\|@patch" --include='*.py' tests/` |
 | ≥90% project coverage on `src/` | [`testing_philosophy.md`](testing_philosophy.md) | `--cov-fail-under=90` (canonical command below) |
-| `manuscript/config.yaml` declares every `{{TOKEN}}` | [`rendering_pipeline.md`](rendering_pipeline.md), [`syntax_guide.md`](syntax_guide.md) | `test_all_manuscript_tokens_are_generated` |
+| `docs/manuscript/config.yaml` declares every `{{TOKEN}}` | [`rendering_pipeline.md`](rendering_pipeline.md), [`syntax_guide.md`](syntax_guide.md) | `test_all_manuscript_tokens_are_generated` |
 | Deterministic outputs (fixed seeds); everything in `output/` regeneratable | [`output_conventions.md`](output_conventions.md) | reproducibility checks |
 
 **Prerequisite to know:** the test gate is the **direct** command below (a
@@ -77,5 +78,5 @@ grep -rn "unittest.mock\|MagicMock\|@patch" --include='*.py' tests/ || echo "Cle
 
 - [../AGENTS.md](../AGENTS.md) — Full project documentation (API reference, known issues, complete directory map)
 - [../README.md](../README.md) — Project quick start
-- [../manuscript/AGENTS.md](../manuscript/AGENTS.md) — Manuscript directory rules and `{{VARIABLE}}` protocol
+- [manuscript/AGENTS.md](manuscript/AGENTS.md) — Manuscript directory rules and `{{VARIABLE}}` protocol
 - [output_conventions.md](output_conventions.md) — Output directory structure and regeneration

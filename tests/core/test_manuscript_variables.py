@@ -1,7 +1,7 @@
 """Tests for ``daf_okn.core.manuscript_variables`` (graph-era hydration).
 
 ``generate_variables`` hydrates the manuscript ``{{TOKEN}}`` map from
-``manuscript/config.yaml`` and the graph report written by
+``docs/manuscript/config.yaml`` and the graph report written by
 ``daf_okn.analysis.pipeline.run_analysis``. These tests exercise the fixture
 config + report round trip, the ``--allow-draft`` sentinel fallbacks, the
 strict ``require_analysis_outputs`` failure path, and the live cross-reference
@@ -70,7 +70,7 @@ GRAPH_REPORT = {
 def _make_project(
     tmp_path: Path, *, with_report: bool = True, config_text: str = CONFIG_YAML
 ) -> Path:
-    """Build a minimal project tree: manuscript/config.yaml (+ graph report)."""
+    """Build a minimal project tree: docs/manuscript/config.yaml (+ graph report)."""
     (tmp_path / "manuscript").mkdir(parents=True, exist_ok=True)
     (tmp_path / "manuscript" / "config.yaml").write_text(config_text, encoding="utf-8")
     if with_report:
@@ -162,7 +162,7 @@ def test_non_object_report_json_degrades_to_draft(tmp_path: Path) -> None:
 
 
 def test_config_tokens(tmp_path: Path) -> None:
-    """Title/author/keyword tokens come from ``manuscript/config.yaml``."""
+    """Title/author/keyword tokens come from ``docs/manuscript/config.yaml``."""
     root = _make_project(tmp_path)
     variables = generate_variables(
         root / "manuscript" / "config.yaml", require_analysis_outputs=False
@@ -258,7 +258,7 @@ def test_save_variables_round_trip(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Live cross-reference: every {{TOKEN}} used in manuscript/*.md must be
+# Live cross-reference: every {{TOKEN}} used in docs/manuscript/*.md must be
 # produced by generate_variables().
 # ---------------------------------------------------------------------------
 
@@ -270,14 +270,14 @@ def test_all_manuscript_tokens_are_generated() -> None:
     token_pattern = re.compile(r"\{\{([A-Z][A-Z0-9_]*)\}\}")
     used: set[str] = set()
     _DOC_ONLY = frozenset({"AGENTS.md", "README.md", "SYNTAX.md"})
-    for chapter in sorted((REPO_ROOT / "manuscript").glob("*.md")):
+    for chapter in sorted((REPO_ROOT / "docs" / "manuscript").glob("*.md")):
         if chapter.name in _DOC_ONLY:
             continue  # syntax guides quote {{MY_TOKEN}} placeholders, not real tokens
         used.update(token_pattern.findall(chapter.read_text(encoding="utf-8")))
     used -= {"TOKEN", "MY_TOKEN"}  # generic syntax placeholders quoted in prose
     assert used, "expected {{TOKEN}} placeholders in the manuscript chapters"
     generated = generate_variables(
-        REPO_ROOT / "manuscript" / "config.yaml", require_analysis_outputs=False
+        REPO_ROOT / "docs" / "manuscript" / "config.yaml", require_analysis_outputs=False
     )
     missing = used - set(generated)
     assert not missing, f"manuscript tokens not produced by generate_variables(): {sorted(missing)}"

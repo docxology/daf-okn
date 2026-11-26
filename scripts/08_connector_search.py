@@ -7,7 +7,7 @@ configured keyword through the OKN embeddings service
 (:meth:`OKNRegistry.embedding_search`, api-notes §5.2) — a scored,
 cross-graph "connector" search over the hosted knowledge graphs.
 
-Queries default to the ``keywords`` list in ``manuscript/config.yaml``.
+Queries default to the ``keywords`` list in ``docs/manuscript/config.yaml``.
 Results are written to ``output/data/connector_search/results.json``:
 
     {
@@ -40,6 +40,7 @@ for _path in (PROJECT_ROOT, PROJECT_ROOT / "src"):
     if path_text not in sys.path:
         sys.path.insert(0, path_text)
 
+from daf_okn.core.project_paths import manuscript_source_dir  # noqa: E402
 from daf_okn.core.registry import OKNRegistry, RegistryError  # noqa: E402
 
 logger = logging.getLogger("daf_okn.scripts.connector_search")
@@ -48,7 +49,7 @@ DEFAULT_OUTPUT = PROJECT_ROOT / "output" / "data" / "connector_search" / "result
 
 
 def _keywords_from_config(config_path: Path) -> list[str]:
-    """Return the ``keywords`` list from ``manuscript/config.yaml``."""
+    """Return the ``keywords`` list from ``docs/manuscript/config.yaml``."""
     if not config_path.is_file():
         return []
     config = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
@@ -69,7 +70,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--keywords",
         default=None,
-        help="comma-separated query keywords (default: manuscript/config.yaml keywords)",
+        help="comma-separated query keywords (default: docs/manuscript/config.yaml keywords)",
     )
     parser.add_argument(
         "--limit",
@@ -124,10 +125,10 @@ def main(argv: list[str] | None = None) -> int:
     if args.keywords is not None:
         keywords = [part.strip() for part in args.keywords.split(",") if part.strip()]
     else:
-        keywords = _keywords_from_config(PROJECT_ROOT / "manuscript" / "config.yaml")
+        keywords = _keywords_from_config(manuscript_source_dir(PROJECT_ROOT) / "config.yaml")
     if not keywords:
         logger.error(
-            "no keywords to search (manuscript/config.yaml has no keywords; use --keywords)"
+            "no keywords to search (docs/manuscript/config.yaml has no keywords; use --keywords)"
         )
         return 1
 

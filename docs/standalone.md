@@ -7,7 +7,7 @@
 ## Publication identity
 
 - Standalone repository: [docxology/daf-okn](https://github.com/docxology/daf-okn)
-- Metadata source: [`manuscript/config.yaml`](manuscript/config.yaml); citation sidecars live at the project root.
+- Metadata source: [`docs/manuscript/config.yaml`](manuscript/config.yaml); citation sidecars live at the project root.
 
 <!-- END:PUBLICATION_INDEX -->
 
@@ -19,7 +19,7 @@ Institute `cognitive` knowledge graph to the registry.
 
 ## Post-Fork Edits
 
-- Update `manuscript/config.yaml`, `domain_profile.yaml`, `experiment_plan.yaml`,
+- Update `docs/manuscript/config.yaml`, `domain_profile.yaml`, `experiment_plan.yaml`,
   `CITATION.cff`, `.zenodo.json`, `codemeta.json`, and `pyproject.toml` if you
   fork this project again.
 - Assign Zenodo DOIs and platform identifiers only on first public release;
@@ -28,15 +28,14 @@ Institute `cognitive` knowledge graph to the registry.
 ## Validation Commands
 
 ```bash
-pytest -q --cov=src --cov-branch --cov-fail-under=90   # or: bash scripts/gate.sh (uv, locked)
-ruff check .
+bash scripts/gate.sh
 ```
 
 ## Dependencies
 
-Everything the package needs is declared in `pyproject.toml`; there is no other repository or
-shared infrastructure layer to install. Live OKN services are only contacted by
-`daf-okn pull`.
+Package dependencies are declared in [`pyproject.toml`](../pyproject.toml).
+Registry pulls, live queries, connector search, and live joins use OKN services.
+The [rendering guide](rendering_pipeline.md) covers the separate template checkout.
 
 ## What Not To Claim
 

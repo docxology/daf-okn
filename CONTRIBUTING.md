@@ -20,7 +20,7 @@ mypy -p daf_okn                                         # type check (mypy is in
 - Keep `scripts/` thin: logic belongs in `src/daf_okn/`, scripts only parse arguments and call it.
 - Every folder keeps its `README.md` and `AGENTS.md` pair; update them when behaviour changes.
 - The version lives in `pyproject.toml`, `src/daf_okn/__init__.py`, `CITATION.cff`,
-  `codemeta.json`, `.zenodo.json` and `manuscript/config.yaml`; a test keeps them equal.
+  `codemeta.json`, `.zenodo.json` and `docs/manuscript/config.yaml`; a test keeps them equal.
   Add a `CHANGELOG.md` entry for user-visible changes.
 - RDF output follows the registry's guidance: reuse standard vocabularies, entity IRIs under
   `https://purl.org/okn/frink/kg/<shortname>/`. Change `src/daf_okn/core/rdf.py`, and its tests

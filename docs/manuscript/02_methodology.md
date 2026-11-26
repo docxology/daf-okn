@@ -4,7 +4,7 @@ The pipeline has four stages — **pull**, **export**, **analyze**, **visualize*
 
 ## Registry pull
 
-`OKNRegistry` (`src/daf_okn/core/registry.py`) reads the registry's single machine-readable metadata file, `kgs.yaml` — a YAML mapping with a top-level `kgs:` list of graph entries (`shortname`, `title`, `description`, `sparql`, `tpf`, `stats`, `funding`, `contact`, `frink-options`). `parse_kgs_yaml` validates the envelope, and `list_graphs` returns the 45 graph entries (as of the 2026-09-25 capture documented in [`docs/okn/api-notes.md`](../docs/okn/api-notes.md)). The module performs no I/O at import time: network access happens only inside methods, through an injected `requests.Session` with a per-request timeout, and every HTTP ≥ 400 response or malformed payload raises `RegistryError`.
+`OKNRegistry` (`src/daf_okn/core/registry.py`) reads the registry's single machine-readable metadata file, `kgs.yaml` — a YAML mapping with a top-level `kgs:` list of graph entries (`shortname`, `title`, `description`, `sparql`, `tpf`, `stats`, `funding`, `contact`, `frink-options`). `parse_kgs_yaml` validates the envelope, and `list_graphs` returns the entries. The 2026-09-25 capture is documented in [`docs/okn/api-notes.md`](../okn/api-notes.md). The module performs no I/O at import time: network access happens only inside methods, through an injected `requests.Session` with a per-request timeout, and every HTTP ≥ 400 response or malformed payload raises `RegistryError`.
 
 Query access follows the documented endpoint map:
 
@@ -32,17 +32,15 @@ Structural invariants (`src/daf_okn/core/invariants.py`) gate every load: `valid
 
 Density of the directed projection is [@eq:density]:
 
-\begin{equation}
-\label{eq:density}
+$$
 d = \frac{m}{n\,(n-1)},
-\end{equation}
+$$ {#eq:density}
 
 where $n$ is the node count and $m$ the directed edge count (0.0 when $n < 2$). Mean degree is [@eq:mean_degree]:
 
-\begin{equation}
-\label{eq:mean_degree}
+$$
 \bar{k} = \frac{2m}{n}.
-\end{equation}
+$$ {#eq:mean_degree}
 
 Both are computed by networkx over the directed projection, so parallel edges and attribute payloads do not affect the structural measurement.
 
@@ -60,4 +58,4 @@ Both are computed by networkx over the directed projection, so parallel edges an
 
 ## Token hydration contract
 
-`src/daf_okn/core/manuscript_variables.py` reads `manuscript/config.yaml` (title, authors, keywords, version) and `output/data/graph_report.json` (the `run_analysis` report) and emits the flat `{{TOKEN}}` map persisted to `output/data/manuscript_variables.json`. In pipeline mode (`require_analysis_outputs=True`, the default), a missing or malformed report is a hard `FileNotFoundError`; draft mode (`--allow-draft`) substitutes explicit `N/A` sentinels instead, so a half-run is always visible in the rendered text rather than silently fabricated. `scripts/z_generate_manuscript_variables.py` is the thin orchestrator for this step; it writes the variables JSON and the token-substituted chapters under `output/manuscript/`; turning those copies into PDF or HTML is left to your own Markdown/Pandoc toolchain.
+`src/daf_okn/core/manuscript_variables.py` reads `docs/manuscript/config.yaml` (title, authors, keywords, version) and `output/data/graph_report.json` (the `run_analysis` report) and emits the flat variable map persisted to `output/data/manuscript_variables.json`. In pipeline mode (`require_analysis_outputs=True`, the default), a missing or malformed report is a hard `FileNotFoundError`; draft mode (`--allow-draft`) substitutes explicit `N/A` sentinels instead, so a half-run is always visible in the rendered text rather than silently fabricated. `scripts/z_generate_manuscript_variables.py` is the thin orchestrator for this step; it writes the variables JSON and the token-substituted chapters under `output/manuscript/`. The pinned template consumes those copies to render PDF and HTML.

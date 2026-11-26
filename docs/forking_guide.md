@@ -26,7 +26,7 @@ uv run python scripts/10_research_workflow.py --cognitive-repo <vault>
 
 This project is a **research-tooling skeleton**: pure-logic `src/daf_okn/`,
 thin-orchestrator `scripts/`, real-data `tests/`, token-substituted
-`manuscript/`, and a pull → export → analyze → visualize → hydrate
+`docs/manuscript/`, and a pull → export → analyze → visualize → hydrate
 workflow. The point of the pattern: every numeric in the manuscript is a
 `{{TOKEN}}` registered in one Python function
 (`src/daf_okn/core/manuscript_variables.py::generate_variables()`) and
@@ -44,7 +44,7 @@ the short version:
 
 | Class | Examples | Action |
 |---|---|---|
-| REQUIRED — pipeline gate | `src/daf_okn/core/graph.py`, `core/invariants.py`, `core/manuscript_variables.py` (graph primitives + token hydration), all `tests/**/test_*.py`, `pyproject.toml`, `manuscript/config.yaml`, `manuscript/*.md`, `manuscript/references.bib` | Keep them; the 90% coverage gate and the token cross-check test depend on them |
+| REQUIRED — pipeline gate | `src/daf_okn/core/graph.py`, `core/invariants.py`, `core/manuscript_variables.py` (graph primitives + token hydration), all `tests/**/test_*.py`, `pyproject.toml`, `docs/manuscript/config.yaml`, `docs/manuscript/*.md`, `docs/manuscript/references.bib` | Keep them; the 90% coverage gate and the token cross-check test depend on them |
 | REQUIRED — orchestration | `src/daf_okn/analysis/`, `src/daf_okn/figures/`, `src/daf_okn/dashboard/`, all `scripts/*.py` | Exercised by `scripts/10_research_workflow.py` and the CLI smoke tests |
 | AESTHETIC | `docs/*.md`, `*/STYLE.md`, `*/PATTERNS.md`, `*/CONVENTIONS.md`, `*/AGENTS.md`, `*/README.md` | Convention only; aspire to update them when code changes |
 
@@ -60,10 +60,10 @@ code that writes files.
 ### 2. Update the manuscript variables
 `src/daf_okn/core/manuscript_variables.py::generate_variables()` is the **single
 function** that produces every numeric token referenced in
-`manuscript/*.md`. When you change the domain logic:
+`docs/manuscript/*.md`. When you change the domain logic:
 
 1. Add new tokens to `generate_variables()` and declare them in the
-   `variables:` block of `manuscript/config.yaml`.
+   `variables:` block of `docs/manuscript/config.yaml`.
 2. Reference them in your manuscript as `{{NEW_TOKEN}}`.
 3. The regression test
    `tests/core/test_manuscript_variables.py::test_all_manuscript_tokens_are_generated`

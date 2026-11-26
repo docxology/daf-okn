@@ -11,7 +11,7 @@ Hyperlinks must be informative. Never use placeholder text.
 - **BAD**: [this link](https://okn.us/) to see the registry.
 - **GOOD**: See the [OKN registry](https://registry.okn.us/).
 
-For internal cross-references inside `manuscript/`, prefer relative paths:
+For internal cross-references inside `docs/manuscript/`, prefer relative paths:
 - **BAD**: See `https://github.com/docxology/daf-okn/blob/main/src/daf_okn/core/registry.py`
 - **GOOD**: See [`src/daf_okn/core/registry.py`](https://github.com/docxology/daf-okn/blob/main/src/daf_okn/core/registry.py)
 
@@ -19,7 +19,7 @@ For internal cross-references inside `manuscript/`, prefer relative paths:
 
 ## 2. Pandoc-Crossref Cross-References
 
-Inside `manuscript/` files, use Pandoc-crossref `[@label]` syntax for
+Inside `docs/manuscript/` files, use Pandoc-crossref `[@label]` syntax for
 cross-referencing. **Never** use raw LaTeX `\ref{}` macros in Markdown
 source — they would render literally in HTML output and
 they bypass Pandoc-crossref's auto-numbering. Never hardcode figure or
@@ -53,13 +53,13 @@ When specifying numeric results in the manuscript, use the `{{VARIABLE_NAME}}` s
 
 > The authoritative list of substitution tokens is the return value of
 > `src/daf_okn/core/manuscript_variables.py::generate_variables()`, declared in
-> the `variables:` block of `manuscript/config.yaml`. The regression
+> the `variables:` block of `docs/manuscript/config.yaml`. The regression
 > test `tests/core/test_manuscript_variables.py::test_all_manuscript_tokens_are_generated`
-> reads every `manuscript/*.md` file and fails CI on any token used in prose
+> reads every `docs/manuscript/*.md` file and fails CI on any token used in prose
 > that the generator does not emit. **Treat the generator function — not this
 > table — as the single source of truth**.
 
-**CONFIG_* — Derived from `manuscript/config.yaml`**
+**CONFIG_* — Derived from `docs/manuscript/config.yaml`**
 
 | Token | Source |
 |---|---|
@@ -88,7 +88,7 @@ When specifying numeric results in the manuscript, use the `{{VARIABLE_NAME}}` s
 
 | Token | Source |
 |---|---|
-| `{{CONFIG_HASH}}` | SHA-256 of `manuscript/config.yaml` (truncated) |
+| `{{CONFIG_HASH}}` | SHA-256 of `docs/manuscript/config.yaml` (truncated) |
 | `{{GENERATION_TIMESTAMP}}` | Generation time / `SOURCE_DATE_EPOCH` |
 | `{{PYTHON_VERSION}}` / `{{PLATFORM}}` | Runtime |
 | `{{NETWORKX_VERSION}}` / `{{MATPLOTLIB_VERSION}}` | Runtime |
@@ -99,7 +99,7 @@ When specifying numeric results in the manuscript, use the `{{VARIABLE_NAME}}` s
 
 ### Adding a New Variable
 
-1. Add a key/value pair to `generate_variables()` in `src/daf_okn/core/manuscript_variables.py` and declare it in the `variables:` block of `manuscript/config.yaml`.
+1. Add a key/value pair to `generate_variables()` in `src/daf_okn/core/manuscript_variables.py` and declare it in the `variables:` block of `docs/manuscript/config.yaml`.
 2. Add a corresponding test assertion in `tests/core/test_manuscript_variables.py` (the live cross-reference test `test_all_manuscript_tokens_are_generated` will catch any gap automatically).
 3. Verify it produces a non-empty string: `uv run python scripts/z_generate_manuscript_variables.py && python -c "import json; d=json.load(open('output/data/manuscript_variables.json')); print(d['MY_TOKEN'])"`.
 4. Reference it in a manuscript `.md` file as `{{MY_TOKEN}}`.
@@ -159,10 +159,10 @@ To add a figure that appears in `03_results.md`:
 1. Add the builder function to `src/daf_okn/figures/` and wire it through the workflow script (`scripts/10_research_workflow.py`).
 2. Add the Pandoc image reference in `03_results.md`:
    ```markdown
-   ![Caption text describing the figure.](../output/figures/registry_catalog.png){#fig:new_label}
+   ![Caption text describing the figure.](../../output/figures/registry_catalog.png){#fig:new_label}
    ```
 3. Reference in text using Pandoc-crossref: `See [@fig:new_label].`
-4. Update `manuscript/SYNTAX.md` to document the new figure label and generator.
+4. Update `docs/manuscript/SYNTAX.md` to document the new figure label and generator.
 5. Re-run the workflow and re-render to verify the figure appears.
 
 ---
@@ -186,4 +186,4 @@ d = \frac{m}{n\,(n-1)}
 ```
 
 Reference in text: `[@eq:density]`. The registered equation labels live in
-`manuscript/SYNTAX.md` (`eq:density`, `eq:mean_degree`).
+`docs/manuscript/SYNTAX.md` (`eq:density`, `eq:mean_degree`).
