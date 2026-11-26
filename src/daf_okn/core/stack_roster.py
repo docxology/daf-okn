@@ -139,8 +139,8 @@ def _flag(value: object, field: str, where: str) -> bool:
 
 
 def _required_files(raw: object, where: str) -> tuple[str, ...]:
-    if not isinstance(raw, list) or not raw:
-        raise RosterError(f"{where}: required_files must be a non-empty list, got {raw!r}")
+    if not isinstance(raw, list):
+        raise RosterError(f"{where}: required_files must be a list, got {raw!r}")
     files: list[str] = []
     for item in raw:
         if not isinstance(item, str) or not item.strip():
@@ -165,6 +165,9 @@ def _entry(raw: object, index: int) -> RosterEntry:
     if not path.is_absolute():
         raise RosterError(f"{where}: path must be absolute, got {path}")
     board_text = _optional_text(_require(raw, "board_path", where), "board_path", where)
+    board_path = Path(board_text) if board_text else None
+    if board_path is not None and not board_path.is_absolute():
+        raise RosterError(f"{where}: board_path must be absolute")
     return RosterEntry(
         name=name,
         path=path,
@@ -173,8 +176,17 @@ def _entry(raw: object, index: int) -> RosterEntry:
         require_sidecar=_flag(_require(raw, "require_sidecar", where), "require_sidecar", where),
         gate_cmd=_optional_text(_require(raw, "gate_cmd", where), "gate_cmd", where),
         required_files=_required_files(_require(raw, "required_files", where), where),
-        board_path=Path(board_text) if board_text else None,
+        board_path=board_path,
     )
+
+
+def _unique_fields(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    fields: dict[str, Any] = {}
+    for name, value in pairs:
+        if name in fields:
+            raise RosterError(f"roster contains duplicate JSON field {name!r}")
+        fields[name] = value
+    return fields
 
 
 def parse_roster(text: str) -> Roster:
@@ -195,7 +207,7 @@ def parse_roster(text: str) -> Roster:
         ``parse_roster(text).select("daf-okn")``
     """
     try:
-        payload = json.loads(text)
+        payload = json.loads(text, object_pairs_hook=_unique_fields)
     except json.JSONDecodeError as error:
         raise RosterError(f"roster is not valid JSON: {error}") from error
     if not isinstance(payload, dict):
