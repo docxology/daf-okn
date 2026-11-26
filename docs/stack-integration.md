@@ -92,8 +92,8 @@ checkout from passing the board check on another tree's file.
 
 The gate check verifies a literal checkout-relative script in one simple
 command, including scripts passed to `bash`, `sh`, `python` or `python3`.
-Leading environment assignments and later command arguments do not add
-checkout file requirements. Other forms, including compound commands,
+The check skips leading environment assignments and later command arguments.
+Other forms, including compound commands,
 report the script path as unverified and preserve `native_gate: not_run`.
 
 Exit 0 when every declared requirement holds, 1 for a failing member or an

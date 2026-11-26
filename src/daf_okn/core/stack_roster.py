@@ -347,7 +347,7 @@ def _gate_check(entry: RosterEntry, checkout: Path) -> MemberCheck:
         return {
             "name": "gate",
             "ok": True,
-            "detail": "gate is declared; checkout script path unverified",
+            "detail": "checkout script path unverified for declared gate",
         }
     try:
         target = (checkout / script).resolve()
