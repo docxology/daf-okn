@@ -343,7 +343,39 @@ class TestCheckMember:
         root = _checkout(tmp_path)
         health = _health(_entry(root, gate_cmd="uv run pytest -q"), root)
         assert health["status"] == "pass"
-        assert "no checkout-relative path to check" in _by_name(health)["gate"]["detail"]
+        assert "checkout script path unverified" in _by_name(health)["gate"]["detail"]
+
+    @pytest.mark.parametrize(
+        "command", ["bash scripts/gate.sh", "scripts/gate.sh", "python3 scripts/gate.sh"]
+    )
+    def test_literal_script_checks_one_file(self, tmp_path: Path, command: str) -> None:
+        root = _checkout(tmp_path)
+        health = _health(_entry(root, gate_cmd=command), root)
+        assert _by_name(health)["gate"]["detail"] == "checkout script is present: scripts/gate.sh"
+        assert health["native_gate"] == "not_run"
+
+    def test_gate_check_ignores_generated_outputs(self, tmp_path: Path) -> None:
+        root = _checkout(tmp_path)
+        command = "REPORT=out/report.json bash scripts/gate.sh --report reports/current.json"
+        health = _health(_entry(root, gate_cmd=command), root)
+        assert health["status"] == "pass"
+        assert _by_name(health)["gate"]["detail"] == "checkout script is present: scripts/gate.sh"
+        assert health["native_gate"] == "not_run"
+
+    @pytest.mark.parametrize(
+        "command",
+        [
+            "bash scripts/gate.sh && python tools/check.py",
+            "bash scripts/gate.sh > out/report.json",
+            "bash scripts/gate.sh\npython tools/check.py",
+            'bash "$GATE_SCRIPT"',
+        ],
+    )
+    def test_other_command_forms_report_unverified(self, tmp_path: Path, command: str) -> None:
+        root = _checkout(tmp_path)
+        health = _health(_entry(root, gate_cmd=command), root)
+        assert "checkout script path unverified" in _by_name(health)["gate"]["detail"]
+        assert health["native_gate"] == "not_run"
 
     def test_undeclared_gate_fails(self, tmp_path: Path) -> None:
         """A member without a gate cannot be verified by the coordinator."""
@@ -427,7 +459,7 @@ class TestCheckMember:
         assert checks["gate"] == {
             "name": "gate",
             "ok": True,
-            "detail": f"declared {START_GATE!r}; present: scripts/gate.sh",
+            "detail": "checkout script is present: scripts/gate.sh",
         }
         assert checks["board"]["ok"] is True
         assert health["status"] == "pass", health["checks"]
