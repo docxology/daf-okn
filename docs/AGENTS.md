@@ -89,13 +89,13 @@ viable tool.
 | `scripts/08_connector_search.py`, `scripts/09_provenance_record.py` | REQUIRED (contribution stages) | Registry connector search; provenance record for packaged contributions |
 | `tests/analysis/test_scripts_smoke.py` | AESTHETIC | Subprocess smoke for auxiliary scripts (`generate_api_docs.py`, `00_preflight.py`) |
 | `tests/core/test_documentation.py` | AESTHETIC | Unit tests for `core/documentation.py` API reference helpers |
-| `manuscript/config.yaml` | REQUIRED | Read by `core/manuscript_variables.py`; tests and variable generation use it |
-| `manuscript/*.md` | REQUIRED | Chapter sources; `test_all_manuscript_tokens_are_generated` scans them |
-| `manuscript/references.bib` | AESTHETIC | Bibliography for your own Pandoc run |
-| `manuscript/preamble.md` | AESTHETIC | Optional LaTeX preamble if you render with Pandoc/XeLaTeX |
-| `manuscript/SYNTAX.md` | AESTHETIC | Authoring guide for humans; nothing reads it |
-| `manuscript/config.yaml.example` | AESTHETIC | Documentation; forkers copy → `config.yaml` |
-| `manuscript/AGENTS.md` | AESTHETIC | Agent guide; nothing reads it |
+| `docs/manuscript/config.yaml` | REQUIRED | Read by `core/manuscript_variables.py`; tests and variable generation use it |
+| `docs/manuscript/*.md` | REQUIRED | Chapter sources; `test_all_manuscript_tokens_are_generated` scans them |
+| `docs/manuscript/references.bib` | AESTHETIC | Bibliography for your own Pandoc run |
+| `docs/manuscript/preamble.md` | AESTHETIC | Optional LaTeX preamble if you render with Pandoc/XeLaTeX |
+| `docs/manuscript/SYNTAX.md` | AESTHETIC | Authoring guide for humans; nothing reads it |
+| `docs/manuscript/config.yaml.example` | AESTHETIC | Documentation; forkers copy → `config.yaml` |
+| `docs/manuscript/AGENTS.md` | AESTHETIC | Agent guide; nothing reads it |
 | `docs/*.md` | AESTHETIC | Agent + human documentation; no gate parses these |
 | `src/STYLE.md`, `tests/PATTERNS.md`, `scripts/CONVENTIONS.md` | AESTHETIC | Per-subdir style/test/script conventions |
 | `src/AGENTS.md`, `tests/AGENTS.md`, `scripts/AGENTS.md` | AESTHETIC | Per-subdir agent guides |
@@ -115,5 +115,5 @@ AESTHETIC list as the audit surface that lives outside automated CI.
 - [`../AGENTS.md`](../AGENTS.md) — Project-level documentation (API reference, known issues, full directory map)
 - [`../pyproject.toml`](../pyproject.toml) — Coverage gate settings (`fail_under = 90`, `branch = true`)
 - [`../tests/conftest.py`](../tests/conftest.py) — `sys.path` setup and `MPLBACKEND=Agg`
-- [`../manuscript/AGENTS.md`](../manuscript/AGENTS.md) — Manuscript directory: `{{VARIABLE}}` protocol, figure list, workflow
+- [`manuscript/AGENTS.md`](manuscript/AGENTS.md) — Manuscript directory: `{{VARIABLE}}` protocol, figure list, workflow
 - [`../src/AGENTS.md`](../src/AGENTS.md) — Source-layer module map and dependency rules

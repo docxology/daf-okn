@@ -204,11 +204,10 @@ graph_to_rdf(doc, "demo.ttl", fmt="ttl")
 
 ## Other folders
 
-`docs/` holds user and developer documentation; `docs/okn/` are unofficial digests of OKN web
-pages (see the note at the top of each file). `manuscript/` is a research manuscript about this
-project whose numbers are filled in from pipeline output
-(`python scripts/z_generate_manuscript_variables.py`); this repository does not render a PDF.
-`AGENTS.md` files in each folder are written for AI coding agents.
+Start at the [documentation index](docs/README.md) for setup, verification, and
+OKN registry guides. The [research manuscript](docs/manuscript/README.md)
+uses metrics from the analysis pipeline. The [render guide](docs/rendering_pipeline.md)
+shows how to generate those metrics and build the PDF and HTML with the pinned template.
 
 ## Development
 

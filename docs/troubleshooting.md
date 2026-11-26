@@ -4,7 +4,7 @@ Symptom-driven recipes for the most common breakage modes when running this proj
 
 ## Literal `{{TOKEN_NAME}}` appears in the rendered output
 
-**Cause.** A placeholder in `manuscript/*.md` was not substituted because
+**Cause.** A placeholder in `docs/manuscript/*.md` was not substituted because
 `scripts/z_generate_manuscript_variables.py` was not (re)run after the
 analysis stage, or the token is not defined in `src/daf_okn/core/manuscript_variables.py::generate_variables()`.
 
@@ -150,7 +150,7 @@ Make sure `~/.local/bin` (or the install location) is on your `PATH`.
 uv run python scripts/analyze_graph.py --graph output/data/cognitive_kg.json
 ```
 
-## YAML parse error in `manuscript/config.yaml`
+## YAML parse error in `docs/manuscript/config.yaml`
 
 **Common mistakes.**
 
@@ -161,7 +161,7 @@ uv run python scripts/analyze_graph.py --graph output/data/cognitive_kg.json
 **Fix.** Validate the file before running:
 
 ```bash
-uv run python -c "import yaml; yaml.safe_load(open('manuscript/config.yaml'))"
+uv run python -c "import yaml; yaml.safe_load(open('docs/manuscript/config.yaml'))"
 ```
 
 ## Preflight failures (`00_preflight.py` exits 1)
@@ -169,7 +169,7 @@ uv run python -c "import yaml; yaml.safe_load(open('manuscript/config.yaml'))"
 **Cause.** The preflight script checks Python ≥ 3.11, required dependency
 imports (`yaml`, `requests`, `networkx`, `rdflib`, `matplotlib`, plus
 `daf_okn.core.graph`/`registry` and `daf_okn.analysis.pipeline`), and that
-`manuscript/config.yaml` parses.
+`docs/manuscript/config.yaml` parses.
 
 **Fix.**
 

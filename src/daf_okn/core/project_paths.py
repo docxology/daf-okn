@@ -45,3 +45,12 @@ def project_output_dirs(project_root: Path | None = None) -> dict[str, Path]:
         "reports": output / "reports",
         "web": output / "web",
     }
+
+
+def manuscript_source_dir(project_root: Path) -> Path:
+    """Locate manuscript inputs, including older standalone project roots."""
+    source = project_root / "docs" / "manuscript"
+    legacy = project_root / "manuscript"
+    if not source.is_dir() and legacy.is_dir():
+        return legacy
+    return source

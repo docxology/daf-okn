@@ -1,6 +1,8 @@
 # Manuscript Variables and Rendering
 
-The `manuscript/` directory holds the narrative as Markdown plus `config.yaml`. This repository computes the numbers that go into the prose and writes them to `output/data/manuscript_variables.json`, and writes copies of the chapters with the numbers filled in to `output/manuscript/`; it does not render a PDF or HTML itself. This document describes each step, which scripts run it, and how to troubleshoot failures.
+The maintained sources are in [`docs/manuscript/`](manuscript/README.md).
+DAF-OKN produces the graph metrics, figures, and resolved Markdown. The pinned
+`docxology/template` renderer builds and validates the PDF and HTML.
 
 ## The Research-to-Manuscript Flow
 
@@ -8,11 +10,13 @@ The workflow has two steps; the second needs the first one's `graph_report.json`
 
 ### Pull, export, analyze, visualize
 
+The SciPy version in the command supports sparse spring layouts for large graphs.
+
 **Script**: `scripts/10_research_workflow.py` (from repository root)
 
 **Command**:
 ```bash
-uv run python scripts/10_research_workflow.py --cognitive-repo <vault>
+uv run --locked --with scipy==1.17.1 python scripts/10_research_workflow.py --cognitive-repo <vault>
 ```
 
 **Inputs**: the OKN registry catalog (`kgs.yaml` via `OKNRegistry`), the Active Inference Institute `cognitive` vault (via `--cognitive-repo` or `$DAF_OKN_COGNITIVE_REPO`)
@@ -46,7 +50,7 @@ The individual stages also have thin CLI wrappers: `scripts/pull_registry.py`, `
 uv run python scripts/z_generate_manuscript_variables.py
 ```
 
-**Inputs**: `manuscript/config.yaml` + `output/data/graph_report.json`
+**Inputs**: `docs/manuscript/config.yaml` + `output/data/graph_report.json`
 
 **What it does**: Calls `src/daf_okn/core/manuscript_variables.py::generate_variables(config_path, require_analysis_outputs=True)` (default) to compute all token values, then writes the flat `{TOKEN: value}` mapping to `output/data/manuscript_variables.json` and the token-substituted chapters to `output/manuscript/`.
 
@@ -54,9 +58,59 @@ uv run python scripts/z_generate_manuscript_variables.py
 
 **Output**: `output/data/manuscript_variables.json` — complete `{ "TOKEN": "value" }` mapping, plus the resolved chapters in `output/manuscript/`.
 
-### Rendering
+### Render and validate with the pinned template
 
-`scripts/z_generate_manuscript_variables.py` substitutes the `{{TOKEN}}` markers in `manuscript/*.md` with the values from `manuscript_variables.json` and writes the result to `output/manuscript/` (tokens with no value are left in place and printed). Producing PDF or HTML from those copies is left to whatever Markdown/Pandoc toolchain you use. Before publishing, check that no literal `{{TOKEN}}` text remains in the rendered output. If you render with Pandoc and XeLaTeX, `manuscript/preamble.md` holds a LaTeX package preamble you can pass in as a header include, and `manuscript/references.bib` is the bibliography. Mermaid blocks in the chapters need a Mermaid-aware step if you want them rasterised.
+Use a clean DAF-OKN checkout and install its locked dependencies. Set
+`cognitive_vault` to the absolute path of a checkout of
+[ActiveInferenceInstitute/cognitive](https://github.com/ActiveInferenceInstitute/cognitive).
+The workflow command supplies SciPy for the sparse spring layout used by
+NetworkX on large graphs. Record the vault commit and keep `output/data/registry_snapshot.yaml` with the
+render if you need to reproduce the exact data inputs later.
+
+```bash
+# Run these commands from the daf-okn checkout.
+daf_okn_root="$PWD"
+export UV_PYTHON=3.14
+uv sync --locked --extra dev
+uv run python scripts/00_preflight.py
+uv run --locked --with scipy==1.17.1 python scripts/10_research_workflow.py --cognitive-repo "$cognitive_vault"
+uv run python scripts/09_provenance_record.py --graph output/data/cognitive_kg.json --preset cognitive-kb
+uv run python scripts/z_generate_manuscript_variables.py
+cp docs/manuscript/figure_registry.json output/figures/figure_registry.json
+```
+
+Inspect `output/data/graph_report.json` for analysis problems and
+`output/data/provenance/provenance_record.json` for package validation.
+Hydration writes the generated sections to `output/manuscript/` and reports
+any unresolved variables. Use strict hydration for a render intended to report
+results. Use `--allow-draft` for development when analysis data are unavailable.
+
+Install Python 3.14+ for template, Pandoc, XeLaTeX with the supporting TeX
+packages, and a `pandoc-crossref` build compatible with your Pandoc version.
+Then register the checkout as a project leaf from the template checkout.
+
+```bash
+git clone https://github.com/docxology/template.git
+cd template
+git checkout --detach 87704feae0a4490ef7dad9c931d268e8c30273c2
+uv sync --locked --no-dev
+mkdir -p projects/working
+ln -s "$daf_okn_root" projects/working/daf-okn
+uv run --no-sync python scripts/pipeline/stage_03_render.py --project working/daf-okn --skip-manuscript-hydration
+uv run --no-sync python scripts/pipeline/stage_04_validate.py --project working/daf-okn
+```
+
+Pass `--skip-manuscript-hydration` because the preceding DAF-OKN command
+has already produced the resolved chapters. Stage 03 locates the source
+configuration, preamble, and bibliography in `docs/manuscript/` and uses the
+generated chapters in `output/manuscript/`. Stage 04 uses the project and its
+tracked source to validate the render and write provenance. The figure registry
+links the two manuscript labels to the generated PNGs checked in Stage 04.
+
+Check `output/pdf/daf-okn_combined.pdf`, `output/web/index.html`, and
+`output/reports/` inside the DAF-OKN checkout. Open the combined PDF and HTML
+and confirm that the ordered sections, bibliography, registry catalog figure,
+and cognitive network figure appear and that no results placeholders remain.
 
 ## config.yaml Controls
 
@@ -67,7 +121,7 @@ uv run python scripts/z_generate_manuscript_variables.py
 | `authors[0].name` | `{{CONFIG_FIRST_AUTHOR}}` | `src/daf_okn/core/manuscript_variables.py` |
 | `keywords` | `{{CONFIG_KEYWORDS}}` (comma-joined); default queries for `scripts/08_connector_search.py` | `src/daf_okn/core/manuscript_variables.py`, `scripts/08_connector_search.py` |
 
-The remaining keys (`authors[*]` details, `metadata`, and the `variables:` map) are descriptive; nothing else in the code reads them.
+The template renderer reads paper and author metadata and enables the formats under `render.formats`. The `variables:` map documents the values DAF-OKN supplies.
 
 ## Troubleshooting
 
@@ -86,7 +140,7 @@ ls output/data/manuscript_variables.json
 uv run python scripts/z_generate_manuscript_variables.py
 
 # List tokens used in the chapters
-grep -rhoE "\{\{[A-Z_]+\}\}" manuscript/*.md | sort -u
+grep -rhoE "\{\{[A-Z_]+\}\}" docs/manuscript/*.md | sort -u
 ```
 
 ### `FileNotFoundError` on graph_report.json
@@ -97,7 +151,7 @@ grep -rhoE "\{\{[A-Z_]+\}\}" manuscript/*.md | sort -u
 
 **Fix**:
 ```bash
-uv run python scripts/10_research_workflow.py
+uv run --locked --with scipy==1.17.1 python scripts/10_research_workflow.py --cognitive-repo "$cognitive_vault"
 # or analyze an existing graph document:
 uv run python scripts/analyze_graph.py --graph output/data/cognitive_kg.json --out-dir output/data
 ```
@@ -106,18 +160,18 @@ uv run python scripts/analyze_graph.py --graph output/data/cognitive_kg.json --o
 
 **Symptom**: Broken image placeholder or missing figure reference.
 
-**Cause**: The visualize stage failed to generate one or both figures, or `manuscript/*.md` references a figure that was never generated.
+**Cause**: The visualize stage failed to generate one or both figures, or `docs/manuscript/*.md` references a figure that was never generated.
 
 **Fix**:
 ```bash
 ls output/figures/*.png
-uv run python scripts/10_research_workflow.py
+uv run --locked --with scipy==1.17.1 python scripts/10_research_workflow.py --cognitive-repo "$cognitive_vault"
 ```
 
 ### BibTeX citation error
 
 **Symptom**: Your Pandoc/LaTeX run reports a BibTeX error or an undefined citation key.
 
-**Cause**: Malformed entry in `manuscript/references.bib` (unclosed braces, duplicate keys, missing required fields).
+**Cause**: Malformed entry in `docs/manuscript/references.bib` (unclosed braces, duplicate keys, missing required fields).
 
-**Fix**: Validate `manuscript/references.bib` with a BibTeX linter and check your renderer's log for the specific error message.
+**Fix**: Validate `docs/manuscript/references.bib` with a BibTeX linter and check your renderer's log for the specific error message.

@@ -31,12 +31,12 @@ Auxiliary stages:
 
 ## Manuscript Token Contract
 
-Every `{{TOKEN}}` used in `manuscript/*.md` must be declared in the
-`variables:` block of `manuscript/config.yaml` and produced by
+Every `{{TOKEN}}` used in `docs/manuscript/*.md` must be declared in the
+`variables:` block of `docs/manuscript/config.yaml` and produced by
 `src/daf_okn/core/manuscript_variables.py::generate_variables()`:
 
 - `CONFIG_TITLE`, `CONFIG_SUBTITLE`, `CONFIG_VERSION`, `CONFIG_FIRST_AUTHOR`,
-  `CONFIG_KEYWORDS` — from `manuscript/config.yaml`
+  `CONFIG_KEYWORDS` — from `docs/manuscript/config.yaml`
 - `GRAPH_NAME`, `NODE_COUNT`, `EDGE_COUNT`, `DENSITY_PCT`,
   `WEAKLY_CONNECTED_COMPONENTS`, `STRONGLY_CONNECTED_COMPONENTS`,
   `MEAN_DEGREE`, `TRIANGLE_COUNT`, `TOP_NODE_LABEL`, `TOP_NODE_CENTRALITY` —
@@ -57,7 +57,7 @@ pipeline mode a missing `graph_report.json` fails the build; draft mode
    - **Figures** → `src/daf_okn/figures/` (invoked from `scripts/10_research_workflow.py`)
    - **Reports/packages** → `src/daf_okn/core/contribute.py` (provenance, checklist)
 2. Append a row to the table above naming the file, role, generator, and pipeline stage.
-3. If the new artifact feeds the manuscript, add a `{{TOKEN}}` to `generate_variables()` and declare it in the `variables:` block of `manuscript/config.yaml`.
+3. If the new artifact feeds the manuscript, add a `{{TOKEN}}` to `generate_variables()` and declare it in the `variables:` block of `docs/manuscript/config.yaml`.
 4. Re-run the producing script (`uv run python scripts/10_research_workflow.py`, or the stage's thin wrapper) and confirm the new file appears.
 
 ## Regeneration Sequence
@@ -85,4 +85,4 @@ uv run python scripts/09_provenance_record.py --graph output/data/cognitive_kg.j
 
 - [`output_conventions.md`](output_conventions.md) — layout, regeneration policy, troubleshooting
 - [`rendering_pipeline.md`](rendering_pipeline.md) — manuscript variables and rendering notes
-- [`../manuscript/AGENTS.md`](../manuscript/AGENTS.md) — manuscript directory and `{{TOKEN}}` protocol
+- [`manuscript/AGENTS.md`](manuscript/AGENTS.md) — manuscript directory and `{{TOKEN}}` protocol

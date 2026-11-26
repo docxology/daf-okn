@@ -136,7 +136,7 @@ When AI agents or humans refer to files in logs, documentation, comments, or imp
 | variable map (logic) | `src/daf_okn/core/manuscript_variables.py` |
 | variable map (runner) | `scripts/z_generate_manuscript_variables.py` |
 | research workflow | `scripts/10_research_workflow.py` |
-| config | `manuscript/config.yaml` |
+| config | `docs/manuscript/config.yaml` |
 | analysis report | `output/data/graph_report.json` |
 | manuscript variables | `output/data/manuscript_variables.json` |
 

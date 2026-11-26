@@ -84,7 +84,7 @@ report = run_analysis(graph, out_dir=args.out_dir)
 
 ## Rule 4: "Show, Not Tell" Documentation
 
-When updating `manuscript/` files, use explicit, verifiable references instead of vague descriptions.
+When updating `docs/manuscript/` files, use explicit, verifiable references instead of vague descriptions.
 
 **BAD** (vague, unverifiable):
 ```markdown
@@ -133,7 +133,7 @@ verified.
 ## Rule 6: Style and Syntax Guides Govern Their Domains
 
 - **[`style_guide.md`](style_guide.md)** governs: `src/daf_okn/`, `tests/`, `scripts/*.py` — mock prohibition, thin orchestrator, error message format, type hints.
-- **[`syntax_guide.md`](syntax_guide.md)** governs: `manuscript/*.md` — `{{VARIABLE}}` injection, `[@label]` Pandoc-crossref cross-references, figure labels, table captions.
+- **[`syntax_guide.md`](syntax_guide.md)** governs: `docs/manuscript/*.md` — `{{VARIABLE}}` injection, `[@label]` Pandoc-crossref cross-references, figure labels, table captions.
 
 Do not apply code-style rules to manuscript prose, and do not apply manuscript syntax rules to Python source.
 
@@ -145,8 +145,8 @@ The entire `output/` tree is written by the pipeline and overwritten on every ru
 
 If you need to change what a generated file contains, change the **generator**:
 - To change `output/data/graph_report.json` → modify `src/daf_okn/analysis/pipeline.py` (re-run via `scripts/analyze_graph.py`)
-- To change `output/data/manuscript_variables.json` → modify `src/daf_okn/core/manuscript_variables.py` and/or `manuscript/config.yaml`, then re-run `scripts/z_generate_manuscript_variables.py`
-- To change a rendered manuscript (PDF/HTML) → modify the files in `manuscript/`, then re-render with your own Markdown/Pandoc toolchain
+- To change `output/data/manuscript_variables.json` → modify `src/daf_okn/core/manuscript_variables.py` and/or `docs/manuscript/config.yaml`, then re-run `scripts/z_generate_manuscript_variables.py`
+- To change a rendered manuscript (PDF/HTML) → modify the files in `docs/manuscript/`, then follow the [pinned rendering guide](rendering_pipeline.md)
 
 See [`output_conventions.md`](output_conventions.md) for the complete regeneration sequence.
 

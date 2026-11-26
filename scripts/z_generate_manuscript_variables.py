@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """Thin orchestrator: generate manuscript variables and resolve the chapters.
 
-Reads ``manuscript/config.yaml`` and ``output/data/graph_report.json``, writes
+Reads ``docs/manuscript/config.yaml`` and ``output/data/graph_report.json``, writes
 ``output/data/manuscript_variables.json``, and writes copies of the manuscript
 chapters with every ``{{TOKEN}}`` substituted to ``output/manuscript/``.
 
 All computation lives in ``src/daf_okn/core/manuscript_variables``. This repository
-does not render a PDF; ``output/manuscript/`` is the input for whatever
-Markdown/Pandoc toolchain you use.
+uses the pinned template renderer to consume ``output/manuscript/``. See
+``docs/rendering_pipeline.md``.
 
 Exit codes:
     0   variables written and chapters resolved
@@ -48,16 +48,18 @@ def main(argv: list[str] | None = None) -> int:
         save_variables,
         write_resolved_manuscript,
     )
+    from daf_okn.core.project_paths import manuscript_source_dir
 
+    source = manuscript_source_dir(project_root)
     variables = generate_variables(
-        project_root / "manuscript" / "config.yaml",
+        source / "config.yaml",
         require_analysis_outputs=not args.allow_draft,
     )
     out_path = project_root / "output" / "data" / "manuscript_variables.json"
     save_variables(variables, out_path)
 
     unresolved = write_resolved_manuscript(
-        project_root / "manuscript", project_root / "output" / "manuscript", variables
+        source, project_root / "output" / "manuscript", variables
     )
     for name, tokens in unresolved.items():
         if tokens:

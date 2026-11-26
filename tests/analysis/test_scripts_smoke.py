@@ -77,7 +77,7 @@ def test_preflight_script_passes_with_dependency_stack() -> None:
     assert result.returncode == 0, result.stderr or result.stdout
     assert "[ok] import daf_okn.core.graph" in result.stdout
     assert "[ok] import daf_okn.analysis.pipeline" in result.stdout
-    assert "[ok] manuscript/config.yaml parses" in result.stdout
+    assert "[ok] docs/manuscript/config.yaml parses" in result.stdout
 
 
 def test_preflight_detects_missing_config(tmp_path: Path) -> None:
@@ -87,7 +87,7 @@ def test_preflight_detects_missing_config(tmp_path: Path) -> None:
     preflight = import_module("00_preflight")
     ok, lines = preflight.run_preflight(tmp_path)
     assert not ok
-    assert any("manuscript/config.yaml" in line for line in lines)
+    assert any("docs/manuscript/config.yaml" in line for line in lines)
 
 
 def test_preflight_enforces_declared_python_floor(
@@ -105,9 +105,14 @@ def test_preflight_enforces_declared_python_floor(
 
 def test_z_generate_manuscript_variables_allow_draft(tmp_path: Path) -> None:
     """Draft mode hydrates the JSON without requiring the graph report."""
-    (tmp_path / "manuscript").mkdir()
-    (tmp_path / "manuscript" / "config.yaml").write_text(
+    source = tmp_path / "docs" / "manuscript"
+    source.mkdir(parents=True)
+    (source / "config.yaml").write_text(
         "paper:\n  title: Isolated smoke fixture\n", encoding="utf-8"
+    )
+    (source / "03_results.md").write_text(
+        "Nodes: {{NODE_COUNT}}. ![Graph](../../output/figures/network.png)\n",
+        encoding="utf-8",
     )
     result = _run(
         "z_generate_manuscript_variables.py", "--allow-draft", "--project-root", str(tmp_path)
@@ -123,16 +128,12 @@ def test_z_generate_manuscript_variables_allow_draft(tmp_path: Path) -> None:
         "DENSITY_PCT",
         "TOP_NODE_LABEL",
     }
-    assert variables["CONFIG_TITLE"]
-    # Values must agree with whatever report is present (or the draft sentinel).
-    report_path = tmp_path / "output" / "data" / "graph_report.json"
-    if report_path.is_file():
-        report = json.loads(report_path.read_text(encoding="utf-8"))
-        assert variables["NODE_COUNT"] == str(report["metrics"]["node_count"])
-    else:
-        assert variables["NODE_COUNT"] == "N/A"
-    # Chapters are resolved into output/manuscript/ (none exist in this fixture).
-    assert (tmp_path / "output" / "manuscript").is_dir()
+    assert variables["CONFIG_TITLE"] == "Isolated smoke fixture"
+    assert variables["NODE_COUNT"] == "N/A"
+    resolved = tmp_path / "output" / "manuscript" / "03_results.md"
+    assert resolved.read_text(encoding="utf-8") == (
+        "Nodes: N/A. ![Graph](../figures/network.png)\n"
+    )
 
 
 def test_provenance_record_packages_graph(tmp_path: Path) -> None:

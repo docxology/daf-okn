@@ -3,10 +3,10 @@
 
 Verifies, in order:
 
-1. the minimum Python version (>= 3.10),
+1. the minimum Python version (>= 3.11),
 2. importability of the daf-okn dependency stack (pyyaml, requests, networkx,
    rdflib, matplotlib) and of the core pipeline modules themselves,
-3. that ``manuscript/config.yaml`` exists and parses as YAML.
+3. that ``docs/manuscript/config.yaml`` exists and parses as YAML.
 
 Exits 0 when every check passes, 1 otherwise; diagnostics go to stdout.
 """
@@ -22,6 +22,8 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 SRC_ROOT = PROJECT_ROOT / "src"
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
+from daf_okn.core.project_paths import manuscript_source_dir  # noqa: E402
+
 MIN_PYTHON = (3, 11)
 
 REQUIRED_IMPORTS = (
@@ -59,7 +61,7 @@ def run_preflight(project_root: Path) -> tuple[bool, list[str]]:
         else:
             lines.append(f"[ok] import {module_name}")
 
-    config_path = project_root / "manuscript" / "config.yaml"
+    config_path = manuscript_source_dir(project_root) / "config.yaml"
     if not config_path.is_file():
         lines.append(f"[fail] missing {config_path}")
         ok = False
@@ -67,10 +69,10 @@ def run_preflight(project_root: Path) -> tuple[bool, list[str]]:
         try:
             yaml.safe_load(config_path.read_text(encoding="utf-8"))
         except (yaml.YAMLError, OSError) as exc:
-            lines.append(f"[fail] manuscript/config.yaml does not parse: {exc}")
+            lines.append(f"[fail] {config_path.relative_to(project_root)} does not parse: {exc}")
             ok = False
         else:
-            lines.append("[ok] manuscript/config.yaml parses")
+            lines.append(f"[ok] {config_path.relative_to(project_root)} parses")
 
     return ok, lines
 

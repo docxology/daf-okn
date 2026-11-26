@@ -29,12 +29,12 @@ Each artifact is written by the stage that owns it and read by the next; none is
 
 ## Zero-fabrication verification
 
-Every numeric claim in [@sec:results] is a `{{TOKEN}}` from `manuscript_variables.json`, which itself is derived from `graph_report.json`. The regression test `tests/core/test_manuscript_variables.py::test_all_manuscript_tokens_are_generated` fails CI on any token used in prose that the generator does not emit, and pipeline mode fails the build outright when the report is missing. Draft runs display `N/A` sentinels — a visible, greppable marker, never a plausible-looking number.
+Every numeric claim in [@sec:results] is a generated variable from `manuscript_variables.json`, which itself is derived from `graph_report.json`. The regression test `tests/core/test_manuscript_variables.py::test_all_manuscript_tokens_are_generated` fails CI on any token used in prose that the generator does not emit, and pipeline mode fails the build outright when the report is missing. Draft runs display `N/A` sentinels — a visible, greppable marker, never a plausible-looking number.
 
 To verify token resolution after a run:
 
 ```bash
-python scripts/z_generate_manuscript_variables.py
+uv run python scripts/z_generate_manuscript_variables.py
 python -c "import json; d = json.load(open('output/data/manuscript_variables.json')); print(d['NODE_COUNT'], d['EDGE_COUNT'])"
 # The first command prints "unresolved tokens in <file>: ..." for any token it could not fill;
 # no such line means every token in output/manuscript/ is resolved.
@@ -43,14 +43,15 @@ python -c "import json; d = json.load(open('output/data/manuscript_variables.jso
 ## Reproduction commands
 
 ```bash
-uv sync
+export UV_PYTHON=3.14
+uv sync --locked --extra dev
 uv run pytest tests/ --cov=src --cov-fail-under=90   # test + coverage gate
-python scripts/00_preflight.py                       # environment check
-python scripts/10_research_workflow.py \
-    --cognitive-repo <path-to-cognitive-vault>            # pull → export → analyze → visualize
-python scripts/09_provenance_record.py \
+uv run python scripts/00_preflight.py                       # environment check
+uv run --locked --with scipy==1.17.1 python scripts/10_research_workflow.py \
+    --cognitive-repo "$cognitive_vault"            # pull → export → analyze → visualize
+uv run python scripts/09_provenance_record.py \
     --graph output/data/cognitive_kg.json            # package + hashed receipt
-python scripts/z_generate_manuscript_variables.py    # variable map (pipeline mode)
+uv run python scripts/z_generate_manuscript_variables.py    # variable map (pipeline mode)
 ```
 
 Stages 1 and the connector search require live OKN network access; `export_cognitive` requires the `cognitive` repository root. With the report present, `manuscript_variables.json` reproduces byte-identically given the same config and `SOURCE_DATE_EPOCH`.

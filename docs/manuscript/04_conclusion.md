@@ -4,9 +4,9 @@
 
 ## What the implementation demonstrates
 
-- **Registry-native integration.** The `OKNRegistry` client implements the documented OKN surfaces (`kgs.yaml` metadata, per-graph and federation SPARQL, TPF fragments, embeddings search) without a registry REST API — because none is documented ([`docs/okn/api-notes.md`](../docs/okn/api-notes.md)). The 45-graph catalog is the integration test surface.
+- **Registry-native integration.** The `OKNRegistry` client implements the documented OKN surfaces (`kgs.yaml` metadata, per-graph and federation SPARQL, TPF fragments, embeddings search) without a registry REST API — because none is documented ([`docs/okn/api-notes.md`](../okn/api-notes.md)). The captured catalog determines the graph inventory for an analysis run.
 - **One data path from vault to registry.** The `cognitive` Obsidian vault, SPARQL result bindings, and hand-built documents all enter through the same `GraphDocument` model and the same invariants, so the analysis and packaging stages are graph-source-agnostic.
-- **Zero-fabrication rendering.** Prose numbers are `{{TOKEN}}` placeholders hydrated from `output/data/graph_report.json`; a missing report either fails the build (pipeline mode) or renders visible `N/A` sentinels (draft mode). The manuscript cannot quietly drift from the analysis.
+- **Zero-fabrication rendering.** The manuscript hydrates its graph metrics from `output/data/graph_report.json`. Strict mode requires the report, and draft mode displays `N/A` in place of unavailable metrics.
 - **Auditable packaging.** Contribution packages are validated against structural problems and hashed into a provenance receipt before anything is submitted.
 
 ## Key insights

@@ -3,7 +3,7 @@
 Called exclusively by ``scripts/z_generate_manuscript_variables.py`` (thin
 orchestrator), :func:`generate_variables` reads:
 
-* ``manuscript/config.yaml`` — paper metadata (title, subtitle, version,
+* ``docs/manuscript/config.yaml`` — paper metadata (title, subtitle, version,
   authors, keywords) consumed for the ``CONFIG_*`` tokens, and
 * ``output/data/graph_report.json`` — the JSON report written by
   :func:`daf_okn.analysis.pipeline.run_analysis` (wired through
@@ -58,7 +58,7 @@ _DRAFT_SENTINEL = "N/A"
 
 
 def _load_config(config_path: Path) -> dict[str, Any]:
-    """Load ``manuscript/config.yaml``; an absent file degrades to ``{}``."""
+    """Load ``docs/manuscript/config.yaml``; an absent file degrades to ``{}``."""
     if not config_path.is_file():
         logger.warning("Manuscript config not found: %s", config_path)
         return {}
@@ -161,8 +161,8 @@ def generate_variables(
     """Generate all manuscript variables from config and the graph report.
 
     Args:
-        config_path: Path to ``manuscript/config.yaml``. The project root is
-            its parent directory, so the graph report is read from
+        config_path: Path to ``docs/manuscript/config.yaml``. The project root is
+            inferred from its directory, and the graph report is read from
             ``<root>/output/data/graph_report.json``.
         require_analysis_outputs: When True (pipeline path), a missing or
             malformed graph report raises :class:`FileNotFoundError` instead of
@@ -175,7 +175,10 @@ def generate_variables(
         ready for :func:`save_variables` and :func:`write_resolved_manuscript`.
     """
     config_path = Path(config_path)
-    project_root = config_path.resolve().parent.parent
+    manuscript_dir = config_path.resolve().parent
+    project_root = manuscript_dir.parent
+    if manuscript_dir.name == "manuscript" and project_root.name == "docs":
+        project_root = project_root.parent
     config = _load_config(config_path)
     report = _load_graph_report(project_root)
 
@@ -280,7 +283,12 @@ def write_resolved_manuscript(
                 missing.append(name)
             return match.group(0)
 
-        (output_dir / source.name).write_text(_TOKEN.sub(replace, text), encoding="utf-8")
+        resolved = _TOKEN.sub(replace, text)
+        if manuscript_dir.parent.name == "docs":
+            # Generated chapters sit beside output/figures at the same depth as the source.
+            resolved = resolved.replace("](../../output/figures/", "](../figures/")
+            resolved = resolved.replace("](../okn/", "](../../docs/okn/")
+        (output_dir / source.name).write_text(resolved, encoding="utf-8")
         unresolved[source.name] = sorted(set(missing))
     return unresolved
 

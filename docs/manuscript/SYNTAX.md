@@ -1,6 +1,6 @@
 # Manuscript Syntax Reference (daf_okn)
 
-Project-specific overlay on the canonical [`docs/syntax_guide.md`](../docs/syntax_guide.md) — read that file first; this file documents the **daf_okn**-specific figure registry, equation labels, and `{{TOKEN}}` table.
+Project-specific overlay on the canonical [`docs/syntax_guide.md`](../syntax_guide.md) — read that file first; this file documents the **daf_okn**-specific figure registry, equation labels, and `{{TOKEN}}` table.
 
 ## Citation Syntax (Pandoc)
 
@@ -46,7 +46,7 @@ Reference equations with `[@eq:label]` (parenthetical) or `@eq:label` (narrative
 
 ```markdown
 <!-- Figure with label -->
-![Registry catalog bar chart](../output/figures/registry_catalog.png){#fig:registry_catalog width=95%}
+![Registry catalog bar chart](../../output/figures/registry_catalog.png){#fig:registry_catalog width=95%}
 
 <!-- Reference in text -->
 [@fig:registry_catalog] demonstrates...
@@ -150,7 +150,7 @@ If you assemble the chapters yourself, use lexicographic file order. The `00_` p
 
 ## `{{TOKEN}}` table
 
-Token values are produced by `src/daf_okn/core/manuscript_variables.py::generate_variables()` from `manuscript/config.yaml` (listed in its `variables:` reference map) and `output/data/graph_report.json`; the authoritative list is the generator's return value. The regression test `tests/core/test_manuscript_variables.py::test_all_manuscript_tokens_are_generated` reads every `manuscript/*.md` file and fails CI on any token used in prose that the generator does not emit.
+Token values are produced by `src/daf_okn/core/manuscript_variables.py::generate_variables()` from `docs/manuscript/config.yaml` (listed in its `variables:` reference map) and `output/data/graph_report.json`; the authoritative list is the generator's return value. The regression test `tests/core/test_manuscript_variables.py::test_all_manuscript_tokens_are_generated` reads every `docs/manuscript/*.md` file and fails CI on any token used in prose that the generator does not emit.
 
 | Token | Source | Used in |
 |---|---|---|
@@ -182,6 +182,6 @@ Token values are produced by `src/daf_okn/core/manuscript_variables.py::generate
 
 ## See Also
 
-- [`../docs/syntax_guide.md`](../docs/syntax_guide.md) — complete `{{TOKEN}}` protocol
+- [`../syntax_guide.md`](../syntax_guide.md) — complete `{{TOKEN}}` protocol
 - [`AGENTS.md`](AGENTS.md) — RASP protocol and AI agent constraints
 - [`config.yaml`](config.yaml) — `variables:` reference map of this token table

@@ -38,7 +38,8 @@ def test_version_is_consistent_across_every_metadata_file() -> None:
     assert codemeta["version"] == version
     zenodo = json.loads((ROOT / ".zenodo.json").read_text(encoding="utf-8"))
     assert zenodo["version"] == version
-    config = yaml.safe_load((ROOT / "manuscript" / "config.yaml").read_text(encoding="utf-8"))
+    config_path = ROOT / "docs" / "manuscript" / "config.yaml"
+    config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
     assert str(config["paper"]["version"]) == version
 
 

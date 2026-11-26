@@ -29,10 +29,19 @@ metadata:
   license: "MIT"
   language: "en"
 
+# Pinned template stages render the hydrated manuscript as PDF and HTML.
+render:
+  formats:
+    pdf: true
+    html: true
+    slides: false
+    docx: false
+    epub: false
+
 # Manuscript variable reference map (documentation only; nothing parses this
 # block). The tokens are produced by generate_variables() in
 # src/daf_okn/core/manuscript_variables.py, run via
-# scripts/z_generate_manuscript_variables.py. Every {{TOKEN}} used in the
+# scripts/z_generate_manuscript_variables.py. Every manuscript variable used in the
 # chapters must be produced by generate_variables(); the regression test
 # tests/core/test_manuscript_variables.py::test_all_manuscript_tokens_are_generated
 # enforces that.
@@ -61,7 +70,7 @@ variables:
   TRIANGLE_COUNT: "graph_report.metrics.triangles"
   TOP_NODE_LABEL: "graph_report.metrics.top_central_nodes[0][0]"
   TOP_NODE_CENTRALITY: "graph_report.metrics.top_central_nodes[0][1]"
-  CONFIG_HASH: "sha256(manuscript/config.yaml), truncated (provenance)"
+  CONFIG_HASH: "sha256(docs/manuscript/config.yaml), truncated (provenance)"
   GENERATION_TIMESTAMP: "generation time / SOURCE_DATE_EPOCH (provenance)"
   PYTHON_VERSION: "runtime (provenance)"
   PLATFORM: "runtime (provenance)"
