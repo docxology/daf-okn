@@ -59,11 +59,9 @@ JSON, and this public checkout consumes that contract without importing
 daf-stack:
 
 ```bash
-# from the daf-stack checkout
-daf-stack-doctor roster --repo daf-okn > roster.json
-
-# from this checkout
-daf-okn stack-health --roster roster.json --checkout .
+# from the configured coordinator workspace, with both commands available
+daf-stack-doctor roster --repo daf-okn |
+  daf-okn stack-health --roster - --checkout /path/to/daf-okn
 ```
 
 `src/daf_okn/core/stack_roster.py::parse_roster` validates the roster document
@@ -79,6 +77,10 @@ defaults to the current directory. The `daf-okn.stack-roster/1` payload holds:
 | `expected_branch`, `measured_branch` | Roster branch and the branch in `.git/HEAD`; `null` when undeclared or unreadable |
 | `checks` | One `{name, ok, detail}` per declared requirement |
 | `native_gate` | Always `not_run` |
+
+Treat roster inputs and observation output as local data. The output includes
+absolute checkout paths and can include paths or a command supplied by the
+roster. Use synthetic data in public examples and uploaded test artifacts.
 
 The checks are `path` (the roster names this checkout), `branch`,
 `required_files` (each declared checkout-relative path exists), `gate` (a

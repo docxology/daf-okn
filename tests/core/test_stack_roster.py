@@ -111,6 +111,13 @@ class TestParseRoster:
         with pytest.raises(RosterError, match="not valid JSON"):
             parse_roster("{not json")
 
+    def test_duplicate_json_fields_are_rejected(self, tmp_path: Path) -> None:
+        text = _roster(_entry(tmp_path)).replace(
+            '"branch": "main"', '"branch": null, "branch": "main"'
+        )
+        with pytest.raises(RosterError, match="duplicate JSON field 'branch'"):
+            parse_roster(text)
+
     def test_non_object_payload_is_rejected(self) -> None:
         """The roster document itself must be a JSON object."""
         with pytest.raises(RosterError, match="must be a JSON object"):
@@ -150,8 +157,16 @@ class TestParseRoster:
         with pytest.raises(RosterError, match="repeats member names: daf-okn"):
             parse_roster(_roster(payload, payload))
 
-    @pytest.mark.parametrize("value", [[], "README.md", [7]])
-    def test_required_files_must_be_a_non_empty_list_of_strings(
+    def test_empty_required_files_add_no_extra_checkout_requirements(self, tmp_path: Path) -> None:
+        root = _checkout(tmp_path)
+        health = _health(_entry(root, required_files=[]), root)
+        assert health["status"] == "pass"
+        assert _by_name(health)["required_files"] == {
+            "name": "required_files", "ok": True, "detail": "0 declared file(s) present"
+        }
+
+    @pytest.mark.parametrize("value", ["README.md", [7]])
+    def test_required_files_must_be_a_list_of_strings(
         self, tmp_path: Path, value: object
     ) -> None:
         """Malformed required_files cannot declare files to check."""
@@ -173,6 +188,10 @@ class TestParseRoster:
         """A numeric gate command is a roster error, not a truthy value."""
         with pytest.raises(RosterError, match="gate_cmd must be a non-empty string"):
             parse_roster(_roster(_entry(tmp_path, gate_cmd=3)))
+
+    def test_relative_board_path_is_rejected(self, tmp_path: Path) -> None:
+        with pytest.raises(RosterError, match="board_path must be absolute"):
+            parse_roster(_roster(_entry(tmp_path, board_path="tasks.yaml")))
 
 
 class TestReadBranch:
