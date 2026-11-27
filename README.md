@@ -25,7 +25,7 @@ sessions. `package` writes files and the contribution checklist. The separate
 
 ## Install
 
-Python 3.11 or newer is declared; CI runs the tests on 3.12, 3.14 and 3.15.
+Python 3.11 or newer is required. The CI test matrix covers Python 3.11, 3.12, 3.14, and 3.15. Use the [locked setup guide](docs/quickstart.md) to reproduce the local examples.
 
 ```bash
 git clone https://github.com/docxology/daf-okn
@@ -37,7 +37,7 @@ daf-okn --version
 
 ## Quickstart
 
-Export a vault, measure it, draw it, and package it for the registry:
+Use the checked-in sample vault to export a graph, measure it, draw it, and create a local contribution bundle. This example writes files locally. The registry submission process is discussed separately.
 
 ```bash
 daf-okn export --repo tests/fixtures/cognitive --out graph.json
