@@ -64,7 +64,7 @@ subcommands: `pull` (`list`, `snapshot` (also accepted as `save-snapshot`), `que
 
 ## Installation/Setup
 
-Install dependencies from this directory with `uv sync` (or
+Install dependencies from this directory with `uv sync --locked` (or
 `pip install -e '.[dev]'`). [`pyproject.toml`](pyproject.toml) declares the
 dependencies and the pytest/coverage settings.
 
@@ -135,7 +135,7 @@ flowchart TB
 ### Common Issues
 
 - **Import Errors**: Ensure the project is run from the project root directory
-- **Missing Dependencies**: Run `uv sync` to install dependencies
+- **Missing Dependencies**: Run `uv sync --locked` to install dependencies
 - **`RegistryError`**: HTTP ≥ 400 or malformed responses from OKN endpoints —
   check network access and `kgs.yaml`; see `docs/troubleshooting.md`
 - **`FileNotFoundError` on `graph_report.json`**: run `scripts/analyze_graph.py`
