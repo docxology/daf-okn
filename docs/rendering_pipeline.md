@@ -60,7 +60,7 @@ uv run python scripts/z_generate_manuscript_variables.py
 
 ### Render and validate with the pinned template
 
-Use a clean DAF-OKN checkout and install its locked dependencies. Set
+Use a clean checkout in a physical directory named `daf-okn` and install its locked dependencies. Set
 `cognitive_vault` to the absolute path of a checkout of
 [ActiveInferenceInstitute/cognitive](https://github.com/ActiveInferenceInstitute/cognitive).
 The workflow command supplies SciPy for the sparse spring layout used by
