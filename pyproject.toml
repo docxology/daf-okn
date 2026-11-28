@@ -14,7 +14,7 @@ readme = "README.md"
 authors = [
     {name = "Daniel Ari Friedman", email = "daniel@activeinference.institute"}
 ]
-requires-python = ">=3.11"
+requires-python = ">=3.14"
 dependencies = [
     "numpy>=1.24.0",
     "matplotlib>=3.7.0",
@@ -91,7 +91,7 @@ exclude_lines = [
 
 [tool.ruff]
 line-length = 100
-target-version = "py311"
+target-version = "py314"
 extend-exclude = [".venv", "output"]
 
 [tool.ruff.lint]

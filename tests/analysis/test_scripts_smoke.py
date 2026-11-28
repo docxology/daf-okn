@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -93,14 +94,16 @@ def test_preflight_detects_missing_config(tmp_path: Path) -> None:
 def test_preflight_enforces_declared_python_floor(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The preflight floor matches pyproject's ``requires-python = ">=3.11"``."""
+    """Preflight refuses versions below the package metadata floor."""
     from importlib import import_module
 
     preflight = import_module("00_preflight")
-    monkeypatch.setattr(sys, "version_info", (3, 10, 14, "final", 0))
+    metadata = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    assert metadata["project"]["requires-python"] == f">={'.'.join(map(str, preflight.MIN_PYTHON))}"
+    monkeypatch.setattr(sys, "version_info", (3, 13, 9, "final", 0))
     ok, lines = preflight.run_preflight(tmp_path)
     assert not ok
-    assert "[fail] python 3.10 < required 3.11" in lines
+    assert "[fail] python 3.13 < required 3.14" in lines
 
 
 def test_z_generate_manuscript_variables_allow_draft(tmp_path: Path) -> None:

@@ -7,16 +7,17 @@ import json
 from collections import Counter
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Final, TypeAlias
+from typing import Final
 
 from rdflib import Dataset, Literal, URIRef
 from rdflib.namespace import DCTERMS, RDF, RDFS, SKOS
 
 from daf_okn.core.rdf import SCHEMA
 
-Json: TypeAlias = str | int | bool | None | list["Json"] | dict[str, "Json"]
-Triple: TypeAlias = tuple[URIRef, URIRef, URIRef | Literal]
-Solution: TypeAlias = Mapping[str, URIRef | Literal]
+type Json = str | int | bool | None | list[Json] | dict[str, Json]
+type Triple = tuple[URIRef, URIRef, URIRef | Literal]
+type Solution = Mapping[str, URIRef | Literal]
+
 GRAPH: Final = "https://purl.org/okn/frink/kg/cognitive-kb"
 MAPPINGS: Final = "https://purl.org/okn/frink/kg/identifier-mappings"
 UBERGRAPH: Final = "https://purl.org/okn/frink/kg/ubergraph"

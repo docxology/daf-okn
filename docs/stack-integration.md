@@ -141,7 +141,7 @@ The native gate stays `bash scripts/gate.sh`: locked dev dependencies, whole
 suite and the existing branch coverage threshold. Install the admitted runtime
 before any status/gate bridge call; do not provision during a consumer call.
 An offline cache miss is an environment blocker, not a passing gate. On hosts
-with cached Python 3.12 packages, `UV_OFFLINE=1 UV_PYTHON=3.12 bash
+with cached Python 3.14 packages, `UV_OFFLINE=1 UV_PYTHON=3.14 bash
 scripts/gate.sh` selects that runtime without changing the lock or gate profile.
 
 `tests/analysis/test_artifact_status.py` covers successful CLI inspection with
