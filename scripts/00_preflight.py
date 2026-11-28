@@ -3,7 +3,7 @@
 
 Verifies, in order:
 
-1. the minimum Python version (>= 3.11),
+1. the minimum Python version (>= 3.14),
 2. importability of the daf-okn dependency stack (pyyaml, requests, networkx,
    rdflib, matplotlib) and of the core pipeline modules themselves,
 3. that ``docs/manuscript/config.yaml`` exists and parses as YAML.
@@ -24,7 +24,7 @@ if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 from daf_okn.core.project_paths import manuscript_source_dir  # noqa: E402
 
-MIN_PYTHON = (3, 11)
+MIN_PYTHON = (3, 14)
 
 REQUIRED_IMPORTS = (
     "yaml",

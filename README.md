@@ -25,7 +25,9 @@ sessions. `package` writes files and the contribution checklist. The separate
 
 ## Install
 
-Python 3.11 or newer is required. The CI test matrix covers Python 3.11, 3.12, 3.14, and 3.15. Use the [locked setup guide](docs/quickstart.md) to reproduce the local examples.
+Python 3.14 or newer is required. The CI workflow runs the package gate on
+Python 3.14 and 3.15. Use the [locked setup guide](docs/quickstart.md) to reproduce
+the local examples.
 
 ```bash
 git clone https://github.com/docxology/daf-okn
